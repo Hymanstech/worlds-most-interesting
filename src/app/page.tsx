@@ -1,65 +1,194 @@
-import Image from "next/image";
+// src/app/page.tsx
+'use client';
 
-export default function Home() {
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebaseClient';
+
+type CrownStatus = {
+  // Public fields in /crownStatus/current
+  currentChampionName?: string;
+  currentChampionBio?: string;
+  currentChampionPhotoUrl?: string;
+
+  // Optional (if you add later)
+  featuredImageUrl?: string;
+  featuredVideoUrl?: string;
+  updatedAt?: any; // Firestore Timestamp
+};
+
+export default function HomePage() {
+  const [status, setStatus] = useState<CrownStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function load() {
+      try {
+        setLoading(true);
+        const ref = doc(db, 'crownStatus', 'current');
+        const snap = await getDoc(ref);
+
+        if (!mounted) return;
+
+        if (snap.exists()) setStatus(snap.data() as CrownStatus);
+        else setStatus(null);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const championName = status?.currentChampionName?.trim() || 'No champion yet';
+  const championBio =
+    status?.currentChampionBio?.trim() ||
+    'No one is wearing the crown right now. Check back soon—or claim the spot by setting up your profile.';
+  const championPhoto = status?.currentChampionPhotoUrl?.trim() || '';
+
+  // Optional featured media hooks
+  const featuredImageUrl = status?.featuredImageUrl?.trim() || '';
+  const featuredVideoUrl = status?.featuredVideoUrl?.trim() || '';
+
+  // HERO media preference:
+  // 1) featured video (if provided)
+  // 2) featured image (if provided)
+  // 3) champion photo (default)
+  const heroIsVideo = Boolean(featuredVideoUrl);
+  const heroImage = featuredImageUrl || championPhoto;
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <div className="mx-auto max-w-6xl px-4 py-10">
+      {/* Top page intro */}
+      <div className="mb-8">
+        <p className="text-[11px] font-semibold tracking-[0.25em] text-emerald-600">
+          DAILY CROWN
+        </p>
+
+        <div className="mt-3 flex items-end justify-between gap-4">
+          <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
+            Today&apos;s Most Interesting Person
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+
+          <Link
+            href="/how-it-works"
+            className="hidden text-xs font-semibold text-slate-500 hover:text-slate-800 sm:inline-block"
+          >
+            How it works →
+          </Link>
+        </div>
+
+        <p className="mt-3 max-w-3xl text-sm text-slate-600">
+          One person. One day. Their face and story, front and center.
+        </p>
+
+        <div className="mt-3 sm:hidden">
+          <Link
+            href="/how-it-works"
+            className="text-xs font-semibold text-slate-500 hover:text-slate-800"
+          >
+            How it works →
+          </Link>
+        </div>
+      </div>
+
+      {/* Champion FIRST and full-width */}
+      <section className="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        {/* Header row: champion identity */}
+        <div className="border-b border-slate-200 p-6 sm:p-8">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold tracking-[0.2em] text-slate-400">
+                CURRENT M.I.P
+              </p>
+
+              <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+                {championName}
+              </h2>
+
+              {loading && (
+                <p className="mt-2 text-[11px] text-slate-400">
+                  Loading today&apos;s champion…
+                </p>
+              )}
+            </div>
+
+            <span className="shrink-0 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-800">
+              👑 Wearing the crown
+            </span>
+          </div>
+        </div>
+
+        {/* Big hero area (uses champion photo by default) */}
+        <div className="p-6 sm:p-8">
+          {/* IMPORTANT: object-contain so image/video is never cropped */}
+          <div className="rounded-2xl border border-slate-200 overflow-hidden bg-white">
+            <div className="aspect-[16/9] w-full bg-white">
+              {heroIsVideo ? (
+                <video
+                  src={featuredVideoUrl}
+                  controls
+                  className="h-full w-full object-contain bg-white"
+                />
+              ) : heroImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={heroImage}
+                  alt={`${championName} featured`}
+                  className="h-full w-full object-contain bg-white"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center px-6 text-center text-sm text-slate-500">
+                  No photo yet. The next champion will appear here.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Bio AFTER photo */}
+          <p className="mt-5 text-sm leading-relaxed text-slate-700">
+            {championBio}
           </p>
+
+          {/* Optional: If featured media is separate from profile photo, show a subtle note */}
+          {(featuredVideoUrl || featuredImageUrl) && championPhoto && (
+            <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-[10px] font-semibold tracking-[0.2em] text-slate-500">
+                CHAMPION SPOTLIGHT
+              </p>
+              <p className="mt-2 text-xs text-slate-600">
+                Today&apos;s spotlight media is set separately from the profile photo.
+              </p>
+            </div>
+          )}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        {/* Keep only the rules nudge */}
+        <div className="border-t border-slate-200 bg-white p-6 sm:p-8">
+          <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+            <p className="text-xs text-slate-600">
+              Think you&apos;re more interesting? Here&apos;s how to claim the crown.
+            </p>
+
+            <Link
+              href="/how-it-works"
+              className="rounded-full bg-slate-900 px-4 py-2 text-[11px] font-semibold text-white hover:bg-slate-800"
+            >
+              Learn the rules →
+            </Link>
+          </div>
         </div>
-      </main>
+      </section>
+
+      <div className="mt-10 text-center text-[11px] text-slate-400">
+        The crown changes daily.
+      </div>
     </div>
   );
 }
