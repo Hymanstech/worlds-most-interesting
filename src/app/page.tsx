@@ -6,55 +6,107 @@ import { useEffect, useState } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebaseClient';
 
-type CrownStatus = {
-  // Public fields in /crownStatus/current
-  currentChampionName?: string;
-  currentChampionBio?: string;
-  currentChampionPhotoUrl?: string;
+type CrownStatusDoc = {
+  // Nightly / admin crown fields (this is what your backend writes)
+  activeUid?: string | null;
+  activeDateKey?: string | null;
+  activePriceCents?: number | null;
+  activePaymentIntentId?: string | null;
 
-  // Optional (if you add later)
+  // Optional featured media hooks (you already support these)
   featuredImageUrl?: string;
   featuredVideoUrl?: string;
+
   updatedAt?: any; // Firestore Timestamp
 };
 
+type UserDoc = {
+  fullName?: string;
+  bio?: string;
+  photoUrl?: string;
+  // fallback fields if you ever used different names
+  name?: string;
+};
+
 export default function HomePage() {
-  const [status, setStatus] = useState<CrownStatus | null>(null);
+  const [crown, setCrown] = useState<CrownStatusDoc | null>(null);
+  const [champ, setChamp] = useState<UserDoc | null>(null);
+
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
 
     async function load() {
       try {
+        setError(null);
         setLoading(true);
-        const ref = doc(db, 'crownStatus', 'current');
-        const snap = await getDoc(ref);
+
+        // 1) Load crown status
+        const crownRef = doc(db, 'crownStatus', 'current');
+        const crownSnap = await getDoc(crownRef);
 
         if (!mounted) return;
 
-        if (snap.exists()) setStatus(snap.data() as CrownStatus);
-        else setStatus(null);
+        if (!crownSnap.exists()) {
+          setCrown(null);
+          setChamp(null);
+          return;
+        }
+
+        const crownData = crownSnap.data() as CrownStatusDoc;
+        setCrown(crownData);
+
+        const activeUid = crownData.activeUid;
+
+        // 2) Load crowned user profile (users/{uid})
+        if (!activeUid) {
+          setChamp(null);
+          return;
+        }
+
+        const userRef = doc(db, 'users', activeUid);
+        const userSnap = await getDoc(userRef);
+
+        if (!mounted) return;
+
+        if (userSnap.exists()) {
+          setChamp(userSnap.data() as UserDoc);
+        } else {
+          // Crown points to a user doc that doesn't exist (shouldn't happen, but safe)
+          setChamp(null);
+        }
+      } catch (e: any) {
+        console.error('Homepage load error:', e);
+        if (!mounted) return;
+        setError(e?.message || 'Failed to load today’s champion.');
+        setCrown(null);
+        setChamp(null);
       } finally {
         if (mounted) setLoading(false);
       }
     }
 
     load();
+
     return () => {
       mounted = false;
     };
   }, []);
 
-  const championName = status?.currentChampionName?.trim() || 'No champion yet';
-  const championBio =
-    status?.currentChampionBio?.trim() ||
-    'No one is wearing the crown right now. Check back soon—or claim the spot by setting up your profile.';
-  const championPhoto = status?.currentChampionPhotoUrl?.trim() || '';
+  const championName =
+    (champ?.fullName || champ?.name || '').trim() || 'No champion yet';
 
-  // Optional featured media hooks
-  const featuredImageUrl = status?.featuredImageUrl?.trim() || '';
-  const featuredVideoUrl = status?.featuredVideoUrl?.trim() || '';
+  const championBio =
+    (champ?.bio || '').trim() ||
+    'No one is wearing the crown right now. Check back soon—or claim the spot by setting up your profile.';
+
+  const championPhoto = (champ?.photoUrl || '').trim();
+
+  // Optional featured media hooks (from crownStatus/current)
+  const featuredImageUrl = (crown?.featuredImageUrl || '').trim();
+  const featuredVideoUrl = (crown?.featuredVideoUrl || '').trim();
 
   // HERO media preference:
   // 1) featured video (if provided)
@@ -117,6 +169,12 @@ export default function HomePage() {
                   Loading today&apos;s champion…
                 </p>
               )}
+
+              {error && (
+                <p className="mt-2 text-[11px] text-red-600">
+                  {error}
+                </p>
+              )}
             </div>
 
             <span className="shrink-0 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-800">
@@ -125,9 +183,8 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Big hero area (uses champion photo by default) */}
+        {/* Big hero area */}
         <div className="p-6 sm:p-8">
-          {/* IMPORTANT: object-contain so image/video is never cropped */}
           <div className="rounded-2xl border border-slate-200 overflow-hidden bg-white">
             <div className="aspect-[16/9] w-full bg-white">
               {heroIsVideo ? (
@@ -151,12 +208,10 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Bio AFTER photo */}
           <p className="mt-5 text-sm leading-relaxed text-slate-700">
             {championBio}
           </p>
 
-          {/* Optional: If featured media is separate from profile photo, show a subtle note */}
           {(featuredVideoUrl || featuredImageUrl) && championPhoto && (
             <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <p className="text-[10px] font-semibold tracking-[0.2em] text-slate-500">
@@ -169,7 +224,6 @@ export default function HomePage() {
           )}
         </div>
 
-        {/* Keep only the rules nudge */}
         <div className="border-t border-slate-200 bg-white p-6 sm:p-8">
           <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
             <p className="text-xs text-slate-600">
