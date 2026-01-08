@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   onAuthStateChanged,
   signOut,
@@ -12,6 +13,8 @@ import {
 import { auth } from '@/lib/firebaseClient';
 
 export default function AuthNav() {
+  const router = useRouter();
+
   const [user, setUser] = useState<User | null>(null);
   const [ready, setReady] = useState(false);
 
@@ -27,6 +30,15 @@ export default function AuthNav() {
     return () => unsub();
   }, []);
 
+  async function handleLogout() {
+    try {
+      await signOut(auth);
+      router.push('/'); // ✅ redirect to home
+    } catch (err) {
+      console.error('Logout failed:', err);
+    }
+  }
+
   // Prevent flashing wrong nav while auth state is resolving
   if (!ready) {
     return <div className="h-5 w-40" />;
@@ -41,7 +53,7 @@ export default function AuthNav() {
 
         <button
           type="button"
-          onClick={() => signOut(auth)}
+          onClick={handleLogout}
           className="text-slate-400 hover:text-slate-700"
         >
           Log out
