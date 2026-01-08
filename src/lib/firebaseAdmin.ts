@@ -1,5 +1,5 @@
 // src/lib/firebaseAdmin.ts
-import admin from 'firebase-admin';
+import admin from "firebase-admin";
 
 function getProjectId() {
   return (
@@ -20,13 +20,20 @@ function initAdmin() {
   if (raw) {
     const serviceAccount = JSON.parse(raw);
 
+    // ✅ Important: env vars often escape newlines in private_key
+    if (typeof serviceAccount.private_key === "string") {
+      serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, "\n");
+    }
+
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
       projectId: serviceAccount.project_id || projectId,
     });
+
     return;
   }
 
+  // Fallback only works in environments with Google ADC (NOT DigitalOcean by default)
   admin.initializeApp({
     credential: admin.credential.applicationDefault(),
     projectId,
@@ -34,7 +41,7 @@ function initAdmin() {
 
   if (!projectId) {
     console.warn(
-      '[firebaseAdmin] No projectId detected. Set FIREBASE_PROJECT_ID or FIREBASE_ADMIN_JSON.'
+      "[firebaseAdmin] No projectId detected. Set FIREBASE_PROJECT_ID or FIREBASE_ADMIN_JSON."
     );
   }
 }
