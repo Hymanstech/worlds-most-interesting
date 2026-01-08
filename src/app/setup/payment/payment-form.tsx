@@ -1,20 +1,21 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
 import { auth } from '@/lib/firebaseClient';
 
 type Props = {
-  customerId: string; // kept because your page passes it; not required by Stripe confirmSetup
+  customerId: string;
 };
 
 export default function PaymentForm({ customerId }: Props) {
+  const router = useRouter();
   const stripe = useStripe();
   const elements = useElements();
 
   const [submitting, setSubmitting] = useState(false);
   const [busyDeactivate, setBusyDeactivate] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function getIdTokenOrThrow() {
@@ -26,7 +27,6 @@ export default function PaymentForm({ customerId }: Props) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    setMessage(null);
 
     if (!stripe || !elements) {
       setError('Stripe is still loading. Please try again in a moment.');
@@ -36,7 +36,7 @@ export default function PaymentForm({ customerId }: Props) {
     try {
       setSubmitting(true);
 
-      // Confirm SetupIntent (created by your /api/payment/create-setup-intent route)
+      // 1) Confirm SetupIntent
       const result = await stripe.confirmSetup({
         elements,
         redirect: 'if_required',
@@ -60,7 +60,7 @@ export default function PaymentForm({ customerId }: Props) {
         throw new Error('Stripe did not return a payment method ID.');
       }
 
-      // Tell server to store default payment method + mark account active
+      // 2) Save payment method on server
       const token = await getIdTokenOrThrow();
 
       const res = await fetch('/api/payment/set-default-payment-method', {
@@ -71,7 +71,7 @@ export default function PaymentForm({ customerId }: Props) {
         },
         body: JSON.stringify({
           paymentMethodId,
-          customerId, // not strictly required, but available
+          customerId,
         }),
       });
 
@@ -80,7 +80,8 @@ export default function PaymentForm({ customerId }: Props) {
         throw new Error(data.error || 'Failed to save payment method.');
       }
 
-      setMessage('Card saved! Your account is now active.');
+      // ✅ SUCCESS → go to dashboard
+      router.push('/dashboard');
     } catch (err: any) {
       console.error('Payment setup error:', err);
       setError(err?.message || 'Payment setup failed.');
@@ -91,7 +92,6 @@ export default function PaymentForm({ customerId }: Props) {
 
   async function handleDeactivate() {
     setError(null);
-    setMessage(null);
 
     try {
       setBusyDeactivate(true);
@@ -110,7 +110,8 @@ export default function PaymentForm({ customerId }: Props) {
         throw new Error(data.error || 'Failed to deactivate account.');
       }
 
-      setMessage('Card removed and account deactivated.');
+      // Optional: stay on page or redirect if you want
+      router.push('/dashboard');
     } catch (err: any) {
       console.error('Deactivate error:', err);
       setError(err?.message || 'Failed to deactivate account.');
@@ -124,8 +125,7 @@ export default function PaymentForm({ customerId }: Props) {
       <form onSubmit={handleSubmit} className="space-y-4">
         <PaymentElement />
 
-        {error ? <p className="text-[11px] text-red-600">{error}</p> : null}
-        {message ? <p className="text-[11px] text-emerald-700">{message}</p> : null}
+        {error && <p className="text-[11px] text-red-600">{error}</p>}
 
         <button
           type="submit"
