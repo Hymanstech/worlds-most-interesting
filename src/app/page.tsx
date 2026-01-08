@@ -6,32 +6,21 @@ import { useEffect, useState } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebaseClient';
 
-type CrownStatusDoc = {
-  // Nightly / admin crown fields (this is what your backend writes)
-  activeUid?: string | null;
-  activeDateKey?: string | null;
-  activePriceCents?: number | null;
-  activePaymentIntentId?: string | null;
+type CrownStatus = {
+  // Public snapshot fields stored in /crownStatus/current
+  currentChampionName?: string;
+  currentChampionBio?: string;
+  currentChampionPhotoUrl?: string;
 
-  // Optional featured media hooks (you already support these)
+  // Optional featured media hooks
   featuredImageUrl?: string;
   featuredVideoUrl?: string;
 
   updatedAt?: any; // Firestore Timestamp
 };
 
-type UserDoc = {
-  fullName?: string;
-  bio?: string;
-  photoUrl?: string;
-  // fallback fields if you ever used different names
-  name?: string;
-};
-
 export default function HomePage() {
-  const [crown, setCrown] = useState<CrownStatusDoc | null>(null);
-  const [champ, setChamp] = useState<UserDoc | null>(null);
-
+  const [status, setStatus] = useState<CrownStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,46 +32,18 @@ export default function HomePage() {
         setError(null);
         setLoading(true);
 
-        // 1) Load crown status
-        const crownRef = doc(db, 'crownStatus', 'current');
-        const crownSnap = await getDoc(crownRef);
+        const ref = doc(db, 'crownStatus', 'current');
+        const snap = await getDoc(ref);
 
         if (!mounted) return;
 
-        if (!crownSnap.exists()) {
-          setCrown(null);
-          setChamp(null);
-          return;
-        }
-
-        const crownData = crownSnap.data() as CrownStatusDoc;
-        setCrown(crownData);
-
-        const activeUid = crownData.activeUid;
-
-        // 2) Load crowned user profile (users/{uid})
-        if (!activeUid) {
-          setChamp(null);
-          return;
-        }
-
-        const userRef = doc(db, 'users', activeUid);
-        const userSnap = await getDoc(userRef);
-
-        if (!mounted) return;
-
-        if (userSnap.exists()) {
-          setChamp(userSnap.data() as UserDoc);
-        } else {
-          // Crown points to a user doc that doesn't exist (shouldn't happen, but safe)
-          setChamp(null);
-        }
+        if (snap.exists()) setStatus(snap.data() as CrownStatus);
+        else setStatus(null);
       } catch (e: any) {
         console.error('Homepage load error:', e);
         if (!mounted) return;
         setError(e?.message || 'Failed to load today’s champion.');
-        setCrown(null);
-        setChamp(null);
+        setStatus(null);
       } finally {
         if (mounted) setLoading(false);
       }
@@ -95,23 +56,15 @@ export default function HomePage() {
     };
   }, []);
 
-  const championName =
-    (champ?.fullName || champ?.name || '').trim() || 'No champion yet';
-
+  const championName = status?.currentChampionName?.trim() || 'No champion yet';
   const championBio =
-    (champ?.bio || '').trim() ||
+    status?.currentChampionBio?.trim() ||
     'No one is wearing the crown right now. Check back soon—or claim the spot by setting up your profile.';
+  const championPhoto = status?.currentChampionPhotoUrl?.trim() || '';
 
-  const championPhoto = (champ?.photoUrl || '').trim();
+  const featuredImageUrl = status?.featuredImageUrl?.trim() || '';
+  const featuredVideoUrl = status?.featuredVideoUrl?.trim() || '';
 
-  // Optional featured media hooks (from crownStatus/current)
-  const featuredImageUrl = (crown?.featuredImageUrl || '').trim();
-  const featuredVideoUrl = (crown?.featuredVideoUrl || '').trim();
-
-  // HERO media preference:
-  // 1) featured video (if provided)
-  // 2) featured image (if provided)
-  // 3) champion photo (default)
   const heroIsVideo = Boolean(featuredVideoUrl);
   const heroImage = featuredImageUrl || championPhoto;
 
@@ -152,7 +105,7 @@ export default function HomePage() {
 
       {/* Champion FIRST and full-width */}
       <section className="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        {/* Header row: champion identity */}
+        {/* Header row */}
         <div className="border-b border-slate-200 p-6 sm:p-8">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
@@ -171,9 +124,7 @@ export default function HomePage() {
               )}
 
               {error && (
-                <p className="mt-2 text-[11px] text-red-600">
-                  {error}
-                </p>
+                <p className="mt-2 text-[11px] text-red-600">{error}</p>
               )}
             </div>
 
@@ -183,7 +134,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Big hero area */}
+        {/* Hero media */}
         <div className="p-6 sm:p-8">
           <div className="rounded-2xl border border-slate-200 overflow-hidden bg-white">
             <div className="aspect-[16/9] w-full bg-white">

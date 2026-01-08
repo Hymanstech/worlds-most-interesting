@@ -5,7 +5,6 @@ import { adminAuth, adminDb } from '@/lib/firebaseAdmin';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  // If you don't pin API versions, you can remove this line.
   apiVersion: '2025-02-24.acacia' as any,
 });
 
@@ -36,12 +35,10 @@ function chicagoDateKey(d = new Date()) {
 }
 
 function resolveAmountCents(userDoc: any, bodyAmountCents?: unknown) {
-  // Admin can optionally pass amountCents; otherwise we use user's current offer/price.
   if (typeof bodyAmountCents === 'number' && Number.isFinite(bodyAmountCents)) {
     return Math.round(bodyAmountCents);
   }
 
-  // Prefer cents-based fields
   const cents =
     (typeof userDoc.crownOfferCents === 'number' && userDoc.crownOfferCents) ||
     (typeof userDoc.crownPriceCents === 'number' && userDoc.crownPriceCents) ||
@@ -50,7 +47,6 @@ function resolveAmountCents(userDoc: any, bodyAmountCents?: unknown) {
 
   if (typeof cents === 'number' && Number.isFinite(cents)) return Math.round(cents);
 
-  // Fallback: dollars-based fields
   const dollars =
     (typeof userDoc.crownPrice === 'number' && userDoc.crownPrice) ||
     (typeof userDoc.amount === 'number' && userDoc.amount) ||
@@ -59,6 +55,27 @@ function resolveAmountCents(userDoc: any, bodyAmountCents?: unknown) {
   if (typeof dollars === 'number' && Number.isFinite(dollars)) return Math.round(dollars * 100);
 
   return null;
+}
+
+// ✅ Build the public snapshot the homepage reads from crownStatus/current
+function buildPublicChampionSnapshot(u: any) {
+  const name =
+    (typeof u.fullName === 'string' && u.fullName) ||
+    (typeof u.name === 'string' && u.name) ||
+    '';
+
+  const bio = (typeof u.bio === 'string' && u.bio) || '';
+
+  const photoUrl =
+    (typeof u.photoUrl === 'string' && u.photoUrl) ||
+    (typeof u.profilePhotoUrl === 'string' && u.profilePhotoUrl) ||
+    '';
+
+  return {
+    currentChampionName: String(name || '').trim() || 'No champion yet',
+    currentChampionBio: String(bio || '').trim(),
+    currentChampionPhotoUrl: String(photoUrl || '').trim(),
+  };
 }
 
 export async function POST(request: Request) {
@@ -84,7 +101,6 @@ export async function POST(request: Request) {
 
     const customerId = u.stripeCustomerId;
 
-    // accept either field name
     const paymentMethodId =
       (typeof u.stripeDefaultPaymentMethodId === 'string' && u.stripeDefaultPaymentMethodId) ||
       (typeof u.defaultPaymentMethodId === 'string' && u.defaultPaymentMethodId) ||
@@ -113,7 +129,6 @@ export async function POST(request: Request) {
 
     const amountCents = resolveAmountCents(u, body?.amountCents);
 
-    // Minimum is 50 cents; change to 100 if you prefer $1 minimum.
     if (!amountCents || !Number.isFinite(amountCents) || amountCents < 50) {
       return NextResponse.json(
         { error: 'Invalid or missing crown offer amount (need >= $0.50)' },
@@ -140,7 +155,6 @@ export async function POST(request: Request) {
         },
       },
       {
-        // Prevents double-charging if admin double-clicks or retries
         idempotencyKey: `admin-assign:${settleForDate}:${targetUid}:${amountCents}`,
       }
     );
@@ -165,6 +179,9 @@ export async function POST(request: Request) {
       );
     }
 
+    // ✅ Build public snapshot for homepage (Option A)
+    const snapshot = buildPublicChampionSnapshot(u);
+
     // ✅ Only set the crown AFTER the charge succeeds
     await adminDb.collection('crownStatus').doc('current').set(
       {
@@ -173,6 +190,8 @@ export async function POST(request: Request) {
         activePaymentIntentId: paymentIntent.id,
         activeDateKey: settleForDate,
         activeSince: Timestamp.now(),
+        assignedBy: 'admin',
+        ...snapshot,
         updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true }
@@ -193,7 +212,6 @@ export async function POST(request: Request) {
       paymentIntentId: paymentIntent.id,
     });
   } catch (err: any) {
-    // Stripe "authentication_required" and similar can land here as StripeError
     const message = err?.message || 'Server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }

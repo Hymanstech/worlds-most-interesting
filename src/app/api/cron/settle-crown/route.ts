@@ -78,6 +78,27 @@ async function clearLock(crownRef: FirebaseFirestore.DocumentReference) {
   );
 }
 
+// Safely build the public snapshot we want on crownStatus/current
+function buildPublicChampionSnapshot(u: any) {
+  const name =
+    (typeof u.fullName === "string" && u.fullName) ||
+    (typeof u.name === "string" && u.name) ||
+    "";
+
+  const bio = (typeof u.bio === "string" && u.bio) || "";
+
+  const photoUrl =
+    (typeof u.photoUrl === "string" && u.photoUrl) ||
+    (typeof u.profilePhotoUrl === "string" && u.profilePhotoUrl) ||
+    "";
+
+  return {
+    currentChampionName: String(name || "").trim() || "No champion yet",
+    currentChampionBio: String(bio || "").trim(),
+    currentChampionPhotoUrl: String(photoUrl || "").trim(),
+  };
+}
+
 export async function POST(req: Request) {
   requireCronSecret(req);
 
@@ -132,7 +153,6 @@ export async function POST(req: Request) {
     }
 
     // ---- Load top bidders (by crownPrice only) ----
-    // We only order by crownPrice in Firestore to avoid extra composite index requirements.
     const snap = await adminDb
       .collection("users")
       .where("crownPrice", ">", 0)
@@ -166,7 +186,6 @@ export async function POST(req: Request) {
     // ---- Build candidates, enforce 'active' + sort ties deterministically ----
     const candidates = snap.docs
       .map((d) => ({ uid: d.id, u: d.data() as any }))
-      // Improvement #1: skip inactive users
       .filter(({ u }) => u.isActive === true);
 
     if (candidates.length === 0) {
@@ -202,10 +221,8 @@ export async function POST(req: Request) {
       const aT = tieBreakMillis(a.u);
       const bT = tieBreakMillis(b.u);
 
-      // earliest wins
-      if (aT !== bT) return aT - bT;
+      if (aT !== bT) return aT - bT; // earliest wins
 
-      // final deterministic tie-break: uid
       return a.uid.localeCompare(b.uid);
     });
 
@@ -268,6 +285,9 @@ export async function POST(req: Request) {
           continue;
         }
 
+        // ✅ Build public snapshot fields for homepage
+        const snapshot = buildPublicChampionSnapshot(u);
+
         // Winner!
         await crownRef.set(
           {
@@ -277,6 +297,9 @@ export async function POST(req: Request) {
             activeDateKey: dateKey,
             activeSince: Timestamp.now(),
             assignedBy: "nightly",
+
+            // ✅ Public homepage snapshot (Option A)
+            ...snapshot,
 
             lastSettledForDate: dateKey,
             updatedAt: FieldValue.serverTimestamp(),
