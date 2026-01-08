@@ -7,7 +7,7 @@ import { adminDb } from '@/lib/firebaseAdmin'; // <-- adjust if your export path
 
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-06-20',
+  apiVersion: "2025-11-17.clover" as any,
 });
 
 function getBearerToken(req: Request) {
@@ -37,12 +37,17 @@ export async function POST(req: Request) {
     const stripeCustomerId = user.stripeCustomerId as string | undefined;
     const defaultPaymentMethodId = user.defaultPaymentMethodId as string | undefined;
 
-    // Best-effort: clear default PM on Stripe customer
-    if (stripeCustomerId) {
-      await stripe.customers
-        .update(stripeCustomerId, { invoice_settings: { default_payment_method: null } })
-        .catch(() => {});
-    }
+// Best-effort: clear default PM on Stripe customer
+if (stripeCustomerId) {
+  await stripe.customers
+    .update(stripeCustomerId, {
+      invoice_settings: {
+        default_payment_method: undefined,
+      },
+    })
+    .catch(() => {});
+}
+
 
     // Best-effort: detach PM
     if (defaultPaymentMethodId) {
