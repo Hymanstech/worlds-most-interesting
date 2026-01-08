@@ -1,16 +1,13 @@
-export const runtime = 'nodejs';
+// src/app/api/payment/set-default-method/route.ts
+export const runtime = "nodejs";
 
-import { NextResponse } from 'next/server';
-import Stripe from 'stripe';
-import admin from 'firebase-admin';
-import { adminDb } from '@/lib/firebaseAdmin'; // <-- adjust if your export path differs
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-06-20',
-});
+import { NextResponse } from "next/server";
+import { getStripe } from "@/lib/stripe";
+import { adminAuth, adminDb } from "@/lib/firebaseAdmin";
+import { FieldValue } from "firebase-admin/firestore";
 
 function getBearerToken(req: Request) {
-  const h = req.headers.get('authorization') || '';
+  const h = req.headers.get("authorization") || "";
   const m = h.match(/^Bearer (.+)$/i);
   return m?.[1] ?? null;
 }
@@ -19,27 +16,38 @@ export async function POST(req: Request) {
   try {
     const token = getBearerToken(req);
     if (!token) {
-      return NextResponse.json({ error: 'Missing Authorization token' }, { status: 401 });
+      return NextResponse.json(
+        { error: "Missing Authorization token" },
+        { status: 401 }
+      );
     }
 
-    const decoded = await admin.auth().verifyIdToken(token);
+    const decoded = await adminAuth.verifyIdToken(token);
     const uid = decoded.uid;
 
     const body = (await req.json().catch(() => ({}))) as any;
-    const paymentMethodId = body.paymentMethodId as string | undefined;
+    const paymentMethodId =
+      typeof body.paymentMethodId === "string" ? body.paymentMethodId : undefined;
 
     if (!paymentMethodId) {
-      return NextResponse.json({ error: 'Missing paymentMethodId' }, { status: 400 });
+      return NextResponse.json(
+        { error: "Missing paymentMethodId" },
+        { status: 400 }
+      );
     }
 
-    const userRef = adminDb.collection('users').doc(uid);
+    const userRef = adminDb.collection("users").doc(uid);
     const snap = await userRef.get();
+
     if (!snap.exists) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const user = snap.data() || {};
-    const stripeCustomerId = user.stripeCustomerId as string | undefined;
+    const user = (snap.data() || {}) as any;
+    const stripeCustomerId =
+      typeof user.stripeCustomerId === "string" ? user.stripeCustomerId : undefined;
+
+    const stripe = getStripe();
 
     // Retrieve PM details from Stripe (brand/last4)
     const pm = await stripe.paymentMethods.retrieve(paymentMethodId);
@@ -56,20 +64,21 @@ export async function POST(req: Request) {
     // Mark active + store PM metadata server-side
     await userRef.set(
       {
-        active: true,
-        defaultPaymentMethodId: paymentMethodId,
+        isActive: true, // <-- use whatever your app expects (active vs isActive)
+        stripeDefaultPaymentMethodId: paymentMethodId, // keep in sync with charging code
+        defaultPaymentMethodId: paymentMethodId, // optional compatibility
         cardBrand: brand,
         cardLast4: last4,
-        updatedAt: new Date(),
+        updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true }
     );
 
     return NextResponse.json({ ok: true });
   } catch (err: any) {
-    console.error('Set default PM route error:', err);
+    console.error("Set default PM route error:", err);
     return NextResponse.json(
-      { error: err?.message || 'Failed to save payment method' },
+      { error: err?.message || "Failed to save payment method" },
       { status: 500 }
     );
   }

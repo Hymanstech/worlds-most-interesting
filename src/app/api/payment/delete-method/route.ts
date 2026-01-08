@@ -1,27 +1,30 @@
 // src/app/api/payment/delete-method/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { getStripe } from '@/lib/stripe';
+import { NextRequest, NextResponse } from "next/server";
+import { getStripe } from "@/lib/stripe";
 
 export async function POST(req: NextRequest) {
   try {
     const { paymentMethodId } = await req.json();
 
-    if (!paymentMethodId) {
+    if (!paymentMethodId || typeof paymentMethodId !== "string") {
       return NextResponse.json(
-        { error: 'Missing paymentMethodId' },
+        { error: "Missing or invalid paymentMethodId" },
         { status: 400 }
       );
     }
 
-    await getStripe.paymentMethods.detach(paymentMethodId);
+    const stripe = getStripe();
+
+    await stripe.paymentMethods.detach(paymentMethodId);
 
     return NextResponse.json({ success: true });
   } catch (err: any) {
-    console.error('Error detaching payment method:', err);
+    console.error("Error detaching payment method:", err);
+
     return NextResponse.json(
       {
-        error: 'Failed to detach payment method',
-        details: err?.message ?? 'Unknown error',
+        error: "Failed to detach payment method",
+        details: err?.message ?? "Unknown error",
       },
       { status: 500 }
     );
