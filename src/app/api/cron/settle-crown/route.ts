@@ -27,41 +27,29 @@ function chicagoDateKey(d = new Date()) {
 
 function paymentMethodFromUser(u: any): string | null {
   return (
-    (typeof u.stripeDefaultPaymentMethodId === "string" && u.stripeDefaultPaymentMethodId) ||
-    (typeof u.defaultPaymentMethodId === "string" && u.defaultPaymentMethodId) ||
+    (typeof u?.stripeDefaultPaymentMethodId === "string" && u.stripeDefaultPaymentMethodId) ||
+    (typeof u?.defaultPaymentMethodId === "string" && u.defaultPaymentMethodId) ||
     null
   );
 }
 
 // You store bids as dollars in users.crownPrice -> convert to cents for Stripe
 function amountCentsFromUser(u: any): number | null {
-  if (typeof u.crownPrice === "number" && Number.isFinite(u.crownPrice)) {
+  if (typeof u?.crownPrice === "number" && Number.isFinite(u.crownPrice)) {
     return Math.round(u.crownPrice * 100);
   }
-  // Optional support if you ever add cents later
-  if (typeof u.crownPriceCents === "number" && Number.isFinite(u.crownPriceCents)) {
+  if (typeof u?.crownPriceCents === "number" && Number.isFinite(u.crownPriceCents)) {
     return Math.round(u.crownPriceCents);
   }
   return null;
 }
 
 // Tie-break timestamp for equal bids (earliest wins ties)
-// We prefer a bid-specific timestamp if present; otherwise fall back to updatedAt/createdAt.
 function tieBreakMillis(u: any): number {
-  const t =
-    u.crownPriceUpdatedAt ||
-    u.crownOfferUpdatedAt ||
-    u.updatedAt ||
-    u.createdAt ||
-    null;
+  const t = u?.crownPriceUpdatedAt || u?.crownOfferUpdatedAt || u?.updatedAt || u?.createdAt || null;
 
-  // Firestore Timestamp object
   if (t && typeof t.toMillis === "function") return t.toMillis();
-
-  // JS Date
   if (t instanceof Date) return t.getTime();
-
-  // numeric millis
   if (typeof t === "number" && Number.isFinite(t)) return t;
 
   return 0;
@@ -81,21 +69,27 @@ async function clearLock(crownRef: FirebaseFirestore.DocumentReference) {
 // Safely build the public snapshot we want on crownStatus/current
 function buildPublicChampionSnapshot(u: any) {
   const name =
-    (typeof u.fullName === "string" && u.fullName) ||
-    (typeof u.name === "string" && u.name) ||
+    (typeof u?.fullName === "string" && u.fullName) ||
+    (typeof u?.name === "string" && u.name) ||
+    (typeof u?.displayName === "string" && u.displayName) ||
     "";
 
-  const bio = (typeof u.bio === "string" && u.bio) || "";
+  const bio = (typeof u?.bio === "string" && u.bio) || "";
 
   const photoUrl =
-    (typeof u.photoUrl === "string" && u.photoUrl) ||
-    (typeof u.profilePhotoUrl === "string" && u.profilePhotoUrl) ||
+    (typeof u?.photoUrl === "string" && u.photoUrl) ||
+    (typeof u?.profilePhotoUrl === "string" && u.profilePhotoUrl) ||
+    (typeof u?.photoURL === "string" && u.photoURL) ||
     "";
 
+  const cleanedName = String(name || "").trim();
+  const cleanedBio = String(bio || "").trim();
+  const cleanedPhoto = String(photoUrl || "").trim();
+
   return {
-    currentChampionName: String(name || "").trim() || "No champion yet",
-    currentChampionBio: String(bio || "").trim(),
-    currentChampionPhotoUrl: String(photoUrl || "").trim(),
+    currentChampionName: cleanedName || "No champion yet",
+    currentChampionBio: cleanedBio,
+    currentChampionPhotoUrl: cleanedPhoto,
   };
 }
 
@@ -186,7 +180,7 @@ export async function POST(req: Request) {
     // ---- Build candidates, enforce 'active' + sort ties deterministically ----
     const candidates = snap.docs
       .map((d) => ({ uid: d.id, u: d.data() as any }))
-      .filter(({ u }) => u.isActive === true);
+      .filter(({ u }) => u?.isActive === true);
 
     if (candidates.length === 0) {
       await adminDb.collection("crown_events").add({
@@ -208,20 +202,21 @@ export async function POST(req: Request) {
       );
 
       await clearLock(crownRef);
-      return NextResponse.json({ ok: false, error: "No active offers found", dateKey }, { status: 404 });
+      return NextResponse.json(
+        { ok: false, error: "No active offers found", dateKey },
+        { status: 404 }
+      );
     }
 
-    // Improvement #2: consistent tie-breaker (earliest timestamp wins ties)
     candidates.sort((a, b) => {
-      const aPrice = typeof a.u.crownPrice === "number" ? a.u.crownPrice : 0;
-      const bPrice = typeof b.u.crownPrice === "number" ? b.u.crownPrice : 0;
+      const aPrice = typeof a.u?.crownPrice === "number" ? a.u.crownPrice : 0;
+      const bPrice = typeof b.u?.crownPrice === "number" ? b.u.crownPrice : 0;
 
       if (bPrice !== aPrice) return bPrice - aPrice;
 
       const aT = tieBreakMillis(a.u);
       const bT = tieBreakMillis(b.u);
-
-      if (aT !== bT) return aT - bT; // earliest wins
+      if (aT !== bT) return aT - bT;
 
       return a.uid.localeCompare(b.uid);
     });
@@ -229,7 +224,7 @@ export async function POST(req: Request) {
     // ---- Try charging in sorted order ----
     for (const { uid, u } of candidates) {
       const amountCents = amountCentsFromUser(u);
-      const customerId = u.stripeCustomerId;
+      const customerId = u?.stripeCustomerId;
       const paymentMethodId = paymentMethodFromUser(u);
 
       if (!amountCents || amountCents < 50) {
@@ -285,8 +280,14 @@ export async function POST(req: Request) {
           continue;
         }
 
-        // ✅ Build public snapshot fields for homepage
-        const snapshot = buildPublicChampionSnapshot(u);
+        // ✅ IMPORTANT DIFFERENCE:
+        // Re-fetch the winner user doc fresh (matches manual assign behavior).
+        // This eliminates any “stale/missing fields from query result” issues.
+        const winnerSnap = await adminDb.collection("users").doc(uid).get();
+        const winnerData = winnerSnap.exists ? (winnerSnap.data() as any) : u;
+
+        // ✅ Build public snapshot fields for homepage from the *fresh* winner doc
+        const snapshot = buildPublicChampionSnapshot(winnerData);
 
         // Winner!
         await crownRef.set(
@@ -298,10 +299,15 @@ export async function POST(req: Request) {
             activeSince: Timestamp.now(),
             assignedBy: "nightly",
 
-            // ✅ Public homepage snapshot (Option A)
+            // Public homepage snapshot
             ...snapshot,
 
             lastSettledForDate: dateKey,
+
+            // extra breadcrumbs to debug quickly in Firestore if it ever happens again
+            lastNightlyWinnerUid: uid,
+            lastNightlySnapshot: snapshot,
+
             updatedAt: FieldValue.serverTimestamp(),
           },
           { merge: true }
@@ -314,6 +320,12 @@ export async function POST(req: Request) {
           paymentIntentId: pi.id,
           dateKey,
           createdAt: FieldValue.serverTimestamp(),
+          snapshot,
+          snapshotMeta: {
+            nameLen: (snapshot.currentChampionName || "").length,
+            bioLen: (snapshot.currentChampionBio || "").length,
+            photoLen: (snapshot.currentChampionPhotoUrl || "").length,
+          },
         });
 
         await clearLock(crownRef);
@@ -323,6 +335,7 @@ export async function POST(req: Request) {
           amountCents,
           paymentIntentId: pi.id,
           dateKey,
+          snapshot,
         });
       } catch (err: any) {
         await adminDb.collection("crown_events").add({
