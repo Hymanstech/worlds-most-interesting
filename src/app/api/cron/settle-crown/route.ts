@@ -1,4 +1,3 @@
-// src/app/api/cron/settle-crown/route.ts
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { adminDb } from "@/lib/firebaseAdmin";
@@ -15,7 +14,7 @@ function requireCronSecret(req: Request) {
   }
 }
 
-// "YYYY-MM-DD" in America/Chicago
+// YYYY-MM-DD in America/Chicago
 function chicagoDateKey(d = new Date()) {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Chicago",
@@ -33,7 +32,6 @@ function paymentMethodFromUser(u: any): string | null {
   );
 }
 
-// You store bids as dollars in users.crownPrice -> convert to cents for Stripe
 function amountCentsFromUser(u: any): number | null {
   if (typeof u?.crownPrice === "number" && Number.isFinite(u.crownPrice)) {
     return Math.round(u.crownPrice * 100);
@@ -44,14 +42,11 @@ function amountCentsFromUser(u: any): number | null {
   return null;
 }
 
-// Tie-break timestamp for equal bids (earliest wins ties)
 function tieBreakMillis(u: any): number {
   const t = u?.crownPriceUpdatedAt || u?.crownOfferUpdatedAt || u?.updatedAt || u?.createdAt || null;
-
   if (t && typeof t.toMillis === "function") return t.toMillis();
   if (t instanceof Date) return t.getTime();
   if (typeof t === "number" && Number.isFinite(t)) return t;
-
   return 0;
 }
 
@@ -66,30 +61,33 @@ async function clearLock(crownRef: FirebaseFirestore.DocumentReference) {
   );
 }
 
-// Safely build the public snapshot we want on crownStatus/current
+function pickString(u: any, keys: string[]): string {
+  for (const k of keys) {
+    const v = u?.[k];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return "";
+}
+
+// 🔑 EXACT same snapshot logic as manual assign
 function buildPublicChampionSnapshot(u: any) {
-  const name =
-    (typeof u?.fullName === "string" && u.fullName) ||
-    (typeof u?.name === "string" && u.name) ||
-    (typeof u?.displayName === "string" && u.displayName) ||
-    "";
-
-  const bio = (typeof u?.bio === "string" && u.bio) || "";
-
-  const photoUrl =
-    (typeof u?.photoUrl === "string" && u.photoUrl) ||
-    (typeof u?.profilePhotoUrl === "string" && u.profilePhotoUrl) ||
-    (typeof u?.photoURL === "string" && u.photoURL) ||
-    "";
-
-  const cleanedName = String(name || "").trim();
-  const cleanedBio = String(bio || "").trim();
-  const cleanedPhoto = String(photoUrl || "").trim();
+  const name = pickString(u, ["fullName", "displayName", "name", "username", "handle"]);
+  const bio = pickString(u, ["bio", "about", "description", "profileBio"]);
+  const photoUrl = pickString(u, [
+    "photoUrl",
+    "photoURL",
+    "profilePhotoUrl",
+    "profilePhotoURL",
+    "avatarUrl",
+    "avatarURL",
+    "imageUrl",
+    "imageURL",
+  ]);
 
   return {
-    currentChampionName: cleanedName || "No champion yet",
-    currentChampionBio: cleanedBio,
-    currentChampionPhotoUrl: cleanedPhoto,
+    currentChampionName: name || "No champion yet",
+    currentChampionBio: bio || "",
+    currentChampionPhotoUrl: photoUrl || "",
   };
 }
 
@@ -102,28 +100,22 @@ export async function POST(req: Request) {
   const dateKey = chicagoDateKey(new Date());
   const crownRef = adminDb.collection("crownStatus").doc("current");
 
-  // Force unlock (local dev / emergencies)
   if (force) {
     await clearLock(crownRef);
     return NextResponse.json({ ok: true, forcedUnlock: true, dateKey });
   }
 
   try {
-    // ---- Lock / idempotency guard ----
-    const lockState = await adminDb.runTransaction(async (tx) => {
+    // ---------- Lock ----------
+    const lock = await adminDb.runTransaction(async (tx) => {
       const snap = await tx.get(crownRef);
       const data = snap.exists ? (snap.data() as any) : {};
 
-      if (data.lastSettledForDate === dateKey) {
-        return { alreadySettled: true };
-      }
+      if (data.lastSettledForDate === dateKey) return { alreadySettled: true };
 
-      const inProgressAt: Timestamp | null = data.settlementInProgressAt || null;
-      if (inProgressAt) {
-        const ageMs = Date.now() - inProgressAt.toMillis();
-        if (ageMs < 10 * 60 * 1000) {
-          return { alreadySettling: true };
-        }
+      if (data.settlementInProgressAt) {
+        const ageMs = Date.now() - data.settlementInProgressAt.toMillis();
+        if (ageMs < 10 * 60 * 1000) return { alreadySettling: true };
       }
 
       tx.set(
@@ -139,14 +131,11 @@ export async function POST(req: Request) {
       return { ok: true };
     });
 
-    if ((lockState as any).alreadySettled) {
-      return NextResponse.json({ ok: true, didNothing: true, reason: "alreadySettled", dateKey });
-    }
-    if ((lockState as any).alreadySettling) {
-      return NextResponse.json({ ok: true, didNothing: true, reason: "alreadySettling", dateKey });
+    if (lock.alreadySettled || lock.alreadySettling) {
+      return NextResponse.json({ ok: true, didNothing: true, dateKey });
     }
 
-    // ---- Load top bidders (by crownPrice only) ----
+    // ---------- Candidates ----------
     const snap = await adminDb
       .collection("users")
       .where("crownPrice", ">", 0)
@@ -154,227 +143,79 @@ export async function POST(req: Request) {
       .limit(100)
       .get();
 
-    if (snap.empty) {
-      await adminDb.collection("crown_events").add({
-        type: "NIGHTLY_FAIL",
-        uid: "none",
-        amountCents: 0,
-        dateKey,
-        createdAt: FieldValue.serverTimestamp(),
-        error: "No offers found (no users with crownPrice > 0)",
-      });
-
-      await crownRef.set(
-        {
-          lastAttemptForDate: dateKey,
-          lastAttemptResult: "no_candidates",
-          updatedAt: FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      );
-
-      await clearLock(crownRef);
-      return NextResponse.json({ ok: false, error: "No offers found", dateKey }, { status: 404 });
-    }
-
-    // ---- Build candidates, enforce 'active' + sort ties deterministically ----
     const candidates = snap.docs
-      .map((d) => ({ uid: d.id, u: d.data() as any }))
+      .map((d) => ({ uid: d.id, u: d.data() }))
       .filter(({ u }) => u?.isActive === true);
 
-    if (candidates.length === 0) {
-      await adminDb.collection("crown_events").add({
-        type: "NIGHTLY_FAIL",
-        uid: "none",
-        amountCents: 0,
-        dateKey,
-        createdAt: FieldValue.serverTimestamp(),
-        error: "No active bidders found (all bidders inactive)",
-      });
+    candidates.sort((a, b) => {
+      if (b.u.crownPrice !== a.u.crownPrice) return b.u.crownPrice - a.u.crownPrice;
+      return tieBreakMillis(a.u) - tieBreakMillis(b.u);
+    });
+
+    // ---------- Charge Loop ----------
+    for (const { uid, u } of candidates) {
+      const amountCents = amountCentsFromUser(u);
+      const customerId = u.stripeCustomerId;
+      const paymentMethodId = paymentMethodFromUser(u);
+
+      if (!amountCents || !customerId || !paymentMethodId) continue;
+
+      const pi = await stripe.paymentIntents.create(
+        {
+          amount: amountCents,
+          currency: "usd",
+          customer: customerId,
+          payment_method: paymentMethodId,
+          confirm: true,
+          off_session: true,
+          description: `Crown Winner Charge (${dateKey})`,
+          metadata: { uid, dateKey },
+        },
+        { idempotencyKey: `nightly:${dateKey}:${uid}:${amountCents}` }
+      );
+
+      if (pi.status !== "succeeded") continue;
+
+      // 🔑 Re-fetch user fresh (critical)
+      const freshSnap = await adminDb.collection("users").doc(uid).get();
+      const freshUser = freshSnap.exists ? freshSnap.data() : u;
+
+      const snapshot = buildPublicChampionSnapshot(freshUser);
 
       await crownRef.set(
         {
-          lastAttemptForDate: dateKey,
-          lastAttemptResult: "no_active_candidates",
+          activeUid: uid,
+          currentChampionUid: uid,
+          activePriceCents: amountCents,
+          activePaymentIntentId: pi.id,
+          activeDateKey: dateKey,
+          activeSince: Timestamp.now(),
+          assignedBy: "nightly",
+
+          ...snapshot,
+
+          // cleanup
+          updatedByAdminUid: FieldValue.delete(),
+
+          lastSettledForDate: dateKey,
+          lastNightlySnapshot: snapshot,
+
           updatedAt: FieldValue.serverTimestamp(),
         },
         { merge: true }
       );
 
       await clearLock(crownRef);
-      return NextResponse.json(
-        { ok: false, error: "No active offers found", dateKey },
-        { status: 404 }
-      );
+
+      return NextResponse.json({ ok: true, uid, snapshot });
     }
-
-    candidates.sort((a, b) => {
-      const aPrice = typeof a.u?.crownPrice === "number" ? a.u.crownPrice : 0;
-      const bPrice = typeof b.u?.crownPrice === "number" ? b.u.crownPrice : 0;
-
-      if (bPrice !== aPrice) return bPrice - aPrice;
-
-      const aT = tieBreakMillis(a.u);
-      const bT = tieBreakMillis(b.u);
-      if (aT !== bT) return aT - bT;
-
-      return a.uid.localeCompare(b.uid);
-    });
-
-    // ---- Try charging in sorted order ----
-    for (const { uid, u } of candidates) {
-      const amountCents = amountCentsFromUser(u);
-      const customerId = u?.stripeCustomerId;
-      const paymentMethodId = paymentMethodFromUser(u);
-
-      if (!amountCents || amountCents < 50) {
-        await adminDb.collection("crown_events").add({
-          type: "NIGHTLY_FAIL",
-          uid,
-          amountCents: amountCents || 0,
-          dateKey,
-          createdAt: FieldValue.serverTimestamp(),
-          error: "Invalid amount (crownPrice missing/too low)",
-        });
-        continue;
-      }
-
-      if (!customerId || !paymentMethodId) {
-        await adminDb.collection("crown_events").add({
-          type: "NIGHTLY_FAIL",
-          uid,
-          amountCents,
-          dateKey,
-          createdAt: FieldValue.serverTimestamp(),
-          error: "Missing stripeCustomerId or default payment method id",
-        });
-        continue;
-      }
-
-      try {
-        const pi = await stripe.paymentIntents.create(
-          {
-            amount: amountCents,
-            currency: "usd",
-            customer: customerId,
-            payment_method: paymentMethodId,
-            confirm: true,
-            off_session: true,
-            description: `Crown Winner Charge (${dateKey})`,
-            metadata: { uid, dateKey, purpose: "crown_nightly" },
-          },
-          { idempotencyKey: `nightly:${dateKey}:${uid}:${amountCents}` }
-        );
-
-        if (pi.status !== "succeeded") {
-          await adminDb.collection("crown_events").add({
-            type: "NIGHTLY_FAIL",
-            uid,
-            amountCents,
-            paymentIntentId: pi.id,
-            stripeStatus: pi.status,
-            dateKey,
-            createdAt: FieldValue.serverTimestamp(),
-            error: `Stripe status: ${pi.status}`,
-          });
-          continue;
-        }
-
-        // ✅ IMPORTANT DIFFERENCE:
-        // Re-fetch the winner user doc fresh (matches manual assign behavior).
-        // This eliminates any “stale/missing fields from query result” issues.
-        const winnerSnap = await adminDb.collection("users").doc(uid).get();
-        const winnerData = winnerSnap.exists ? (winnerSnap.data() as any) : u;
-
-        // ✅ Build public snapshot fields for homepage from the *fresh* winner doc
-        const snapshot = buildPublicChampionSnapshot(winnerData);
-
-        // Winner!
-        await crownRef.set(
-          {
-            activeUid: uid,
-            activePriceCents: amountCents,
-            activePaymentIntentId: pi.id,
-            activeDateKey: dateKey,
-            activeSince: Timestamp.now(),
-            assignedBy: "nightly",
-
-            // Public homepage snapshot
-            ...snapshot,
-
-            lastSettledForDate: dateKey,
-
-            // extra breadcrumbs to debug quickly in Firestore if it ever happens again
-            lastNightlyWinnerUid: uid,
-            lastNightlySnapshot: snapshot,
-
-            updatedAt: FieldValue.serverTimestamp(),
-          },
-          { merge: true }
-        );
-
-        await adminDb.collection("crown_events").add({
-          type: "NIGHTLY_WIN",
-          uid,
-          amountCents,
-          paymentIntentId: pi.id,
-          dateKey,
-          createdAt: FieldValue.serverTimestamp(),
-          snapshot,
-          snapshotMeta: {
-            nameLen: (snapshot.currentChampionName || "").length,
-            bioLen: (snapshot.currentChampionBio || "").length,
-            photoLen: (snapshot.currentChampionPhotoUrl || "").length,
-          },
-        });
-
-        await clearLock(crownRef);
-        return NextResponse.json({
-          ok: true,
-          winnerUid: uid,
-          amountCents,
-          paymentIntentId: pi.id,
-          dateKey,
-          snapshot,
-        });
-      } catch (err: any) {
-        await adminDb.collection("crown_events").add({
-          type: "NIGHTLY_FAIL",
-          uid,
-          amountCents: amountCents || 0,
-          dateKey,
-          createdAt: FieldValue.serverTimestamp(),
-          error: err?.message || "Charge error",
-        });
-        continue;
-      }
-    }
-
-    // All failed
-    await crownRef.set(
-      {
-        lastAttemptForDate: dateKey,
-        lastAttemptResult: "all_failed",
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true }
-    );
-
-    await adminDb.collection("crown_events").add({
-      type: "NIGHTLY_FAIL",
-      uid: "all",
-      amountCents: 0,
-      dateKey,
-      createdAt: FieldValue.serverTimestamp(),
-      error: "All top candidates failed payment",
-    });
 
     await clearLock(crownRef);
-    return NextResponse.json({ ok: false, error: "All top offers failed", dateKey }, { status: 402 });
+    return NextResponse.json({ ok: false, error: "No successful charges" }, { status: 402 });
   } catch (err: any) {
     try {
       await clearLock(crownRef);
     } catch {}
-    return NextResponse.json({ ok: false, error: err?.message || "Server error" }, { status: 500 });
+    return NextResponse.json({ ok: false, error: err?.message }, { status: 500 });
   }
 }

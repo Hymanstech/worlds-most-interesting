@@ -17,7 +17,7 @@ async function requireAdmin(request: Request) {
   return decoded.uid;
 }
 
-// pull a likely uid from the crown doc, regardless of your chosen field name
+// Pull a likely uid from the crown doc, regardless of your chosen field name
 function extractUid(crown: any): string | null {
   if (!crown || typeof crown !== 'object') return null;
 
@@ -33,7 +33,7 @@ function extractUid(crown: any): string | null {
 
   if (typeof direct === 'string' && direct.trim()) return direct;
 
-  // fallback: find any field that ends with "uid" and is a string
+  // Fallback: find any field that ends with "uid" and is a string
   for (const [k, v] of Object.entries(crown)) {
     if (typeof v === 'string' && /uid$/i.test(k) && v.trim()) return v;
   }
@@ -41,41 +41,39 @@ function extractUid(crown: any): string | null {
   return null;
 }
 
+type SafeUser = {
+  uid: string;
+  fullName?: string;
+  email?: string;
+  photoUrl?: string;
+  bio?: string;
+};
+
 export async function GET(request: Request) {
   try {
     await requireAdmin(request);
 
-    // Try a few common collection names (Firestore is case-sensitive)
-    const candidates = ['crownStatus', 'crown_status', 'crown_state', 'crownStatus/current']; // last one is harmless if wrong
-    let foundSnap: FirebaseFirestore.DocumentSnapshot | null = null;
-    let foundPath: string | null = null;
+    // ✅ Always read the exact doc the homepage uses.
+    // If you ever truly need to support legacy collection names, do it explicitly,
+    // but defaulting to others can hide problems.
+    const ref = adminDb.collection('crownStatus').doc('current');
+    const snap = await ref.get();
 
-    for (const name of candidates) {
-      // If someone put "crownStatus/current" in candidates, normalize it
-      const parts = name.split('/');
-      const col = parts[0];
-      const docId = parts[1] || 'current';
-
-      const ref = adminDb.collection(col).doc(docId);
-      const snap = await ref.get();
-      if (snap.exists) {
-        foundSnap = snap;
-        foundPath = `${col}/${docId}`;
-        break;
-      }
-    }
-
-    if (!foundSnap || !foundSnap.exists) {
+    if (!snap.exists) {
       return NextResponse.json({
         crown: null,
-        debug: { tried: candidates.map((c) => (c.includes('/') ? c : `${c}/current`)) },
+        debug: {
+          tried: ['crownStatus/current'],
+          reason: 'Document does not exist',
+        },
       });
     }
 
-    const raw = foundSnap.data() as any;
+    const raw = (snap.data() || {}) as any;
     const activeUid = extractUid(raw);
 
-    let user: any = null;
+    // Load the live user doc (source of truth for profile fields)
+    let user: SafeUser | null = null;
     if (activeUid) {
       const userSnap = await adminDb.collection('users').doc(activeUid).get();
       if (userSnap.exists) {
@@ -92,15 +90,47 @@ export async function GET(request: Request) {
       }
     }
 
+    // Snapshot fields that the PUBLIC homepage reads from crownStatus/current
+    const snapshotChampion = {
+      name: raw.currentChampionName || '',
+      bio: raw.currentChampionBio || '',
+      photoUrl: raw.currentChampionPhotoUrl || '',
+    };
+
+    // Live user fields from users/{uid}
+    const userChampion = {
+      name: user?.fullName || '',
+      bio: user?.bio || '',
+      photoUrl: user?.photoUrl || '',
+    };
+
+    // A consistent "best available" resolution for admin display/debugging:
+    // prefer snapshot (what public sees), fallback to user doc (what they have set)
+    const resolvedChampion = {
+      name: snapshotChampion.name || userChampion.name || '',
+      bio: snapshotChampion.bio || userChampion.bio || '',
+      photoUrl: snapshotChampion.photoUrl || userChampion.photoUrl || '',
+    };
+
     return NextResponse.json({
-      crown: { ...raw, activeUid, user },
+      crown: {
+        ...raw,
+        activeUid,
+        user,
+        snapshotChampion,
+        userChampion,
+        resolvedChampion,
+      },
       debug: {
-        foundPath,
-        rawKeys: raw ? Object.keys(raw) : [],
+        foundPath: 'crownStatus/current',
+        rawKeys: Object.keys(raw || {}),
         extractedUid: activeUid,
       },
     });
   } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: err?.message || 'Server error' },
+      { status: 500 }
+    );
   }
 }

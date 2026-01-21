@@ -16,6 +16,12 @@ type AdminUserRow = {
   isActive: boolean;
 };
 
+type ChampionFields = {
+  name?: string;
+  bio?: string;
+  photoUrl?: string;
+};
+
 type CrownStatus = {
   activeUid: string | null;
   crownPrice?: number | null;
@@ -23,6 +29,8 @@ type CrownStatus = {
   activePaymentIntentId?: string | null;
   activeDateKey?: string | null;
   lastSettledForDate?: string | null;
+
+  // Live user doc loaded by the API (users/{uid})
   user?: {
     uid: string;
     fullName?: string;
@@ -30,6 +38,15 @@ type CrownStatus = {
     photoUrl?: string;
     bio?: string;
   } | null;
+
+  // Values stored directly on crownStatus/current (what homepage reads)
+  snapshotChampion?: ChampionFields;
+
+  // Values derived from user doc (users/{uid})
+  userChampion?: ChampionFields;
+
+  // Best available display (prefers snapshot, falls back to user doc)
+  resolvedChampion?: ChampionFields;
 };
 
 export default function AdminPage() {
@@ -185,6 +202,32 @@ export default function AdminPage() {
     return typeof dollars === 'number' ? dollars : null;
   }, [crown]);
 
+  // ✅ This is what we show in the "Current Crown" indicator:
+  // prefer the snapshot values (what the public homepage sees), fallback to user doc
+  const crownDisplay = useMemo(() => {
+    const name =
+      crown?.resolvedChampion?.name ||
+      crown?.snapshotChampion?.name ||
+      crown?.user?.fullName ||
+      '';
+
+    const photoUrl =
+      crown?.resolvedChampion?.photoUrl ||
+      crown?.snapshotChampion?.photoUrl ||
+      crown?.user?.photoUrl ||
+      '';
+
+    const emailOrUid = crown?.user?.email || crown?.activeUid || '';
+
+    // helpful debug: did snapshot differ from user doc?
+    const snapshotName = (crown?.snapshotChampion?.name || '').trim();
+    const userName = (crown?.userChampion?.name || '').trim();
+    const isMismatch =
+      Boolean(snapshotName && userName) && snapshotName.toLowerCase() !== userName.toLowerCase();
+
+    return { name, photoUrl, emailOrUid, isMismatch };
+  }, [crown]);
+
   if (!ready) {
     return (
       <div className="mx-auto max-w-6xl px-4 py-10">
@@ -226,14 +269,15 @@ export default function AdminPage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="text-xs font-semibold text-slate-500">Current Crown</div>
+
             {crownLoading ? (
               <div className="mt-2 text-sm text-slate-600">Loading crown status…</div>
             ) : crown?.activeUid ? (
               <div className="mt-2 flex items-center gap-3">
                 <div className="h-11 w-11 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
-                  {crown.user?.photoUrl ? (
+                  {crownDisplay.photoUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={crown.user.photoUrl} alt="" className="h-full w-full object-cover" />
+                    <img src={crownDisplay.photoUrl} alt="" className="h-full w-full object-cover" />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-[10px] text-slate-400">
                       —
@@ -243,16 +287,22 @@ export default function AdminPage() {
 
                 <div className="min-w-0">
                   <div className="font-semibold text-slate-900 truncate">
-                    {crown.user?.fullName || '(no name)'}
+                    {crownDisplay.name || '(no name)'}
                   </div>
                   <div className="text-[11px] text-slate-500 truncate">
-                    {crown.user?.email || crown.activeUid}
+                    {crownDisplay.emailOrUid || crown.activeUid}
                   </div>
                 </div>
 
                 <span className="ml-2 inline-flex rounded-full bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-700 ring-1 ring-amber-200">
                   Crowned
                 </span>
+
+                {crownDisplay.isMismatch ? (
+                  <span className="inline-flex rounded-full bg-slate-50 px-2 py-1 text-[10px] font-semibold text-slate-600 ring-1 ring-slate-200">
+                    Snapshot differs from user
+                  </span>
+                ) : null}
               </div>
             ) : (
               <div className="mt-2 text-sm text-slate-600">No crown is currently set.</div>
