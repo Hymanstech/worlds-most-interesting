@@ -58,6 +58,22 @@ function tieBreakMillis(u: any): number {
   return 0;
 }
 
+function pickString(u: any, keys: string[]): string {
+  for (const k of keys) {
+    const v = u?.[k];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return "";
+}
+
+function buildPublicChampionSnapshot(u: any) {
+  return {
+    currentChampionName: pickString(u, ["fullName", "displayName", "name"]),
+    currentChampionBio: pickString(u, ["bio"]),
+    currentChampionPhotoUrl: pickString(u, ["photoUrl", "photoURL", "profilePhotoUrl", "profilePhotoURL"]),
+  };
+}
+
 async function clearLock(crownRef: FirebaseFirestore.DocumentReference) {
   await crownRef.set(
     {
@@ -248,6 +264,13 @@ export const settleCrownNightly = onSchedule(
             continue;
           }
 
+          const freshUserSnap = await db.collection("users").doc(uid).get();
+          const freshUser = freshUserSnap.exists ? freshUserSnap.data() : u;
+          const snapshot = buildPublicChampionSnapshot(freshUser);
+          if (!snapshot.currentChampionName) {
+            console.warn("settleCrownNightly winner has empty champion name", { uid });
+          }
+
           // Winner: set crown AFTER successful charge
           await crownRef.set(
             {
@@ -257,12 +280,19 @@ export const settleCrownNightly = onSchedule(
               activeDateKey: dateKey,
               activeSince: admin.firestore.Timestamp.now(),
               assignedBy: "nightly",
+              ...snapshot,
 
               lastSettledForDate: dateKey,
               updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             },
             { merge: true }
           );
+          console.log("settleCrownNightly wrote champion snapshot", {
+            uid,
+            championName: snapshot.currentChampionName,
+            bioLength: snapshot.currentChampionBio.length,
+            hasPhoto: Boolean(snapshot.currentChampionPhotoUrl),
+          });
 
           await db.collection("crown_events").add({
             type: "NIGHTLY_WIN",
