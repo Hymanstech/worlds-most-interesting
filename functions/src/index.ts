@@ -3,6 +3,7 @@ import { defineSecret } from "firebase-functions/params";
 import { setGlobalOptions } from "firebase-functions/v2";
 import * as admin from "firebase-admin";
 import Stripe from "stripe";
+import postmark from "postmark";
 
 admin.initializeApp();
 
@@ -14,6 +15,7 @@ setGlobalOptions({
 
 // Use Firebase Secret Manager (recommended)
 const STRIPE_SECRET_KEY = defineSecret("STRIPE_SECRET_KEY");
+const POSTMARK_SERVER_TOKEN = defineSecret("POSTMARK_SERVER_TOKEN");
 
 // "YYYY-MM-DD" in America/Chicago
 function chicagoDateKey(d = new Date()) {
@@ -74,6 +76,42 @@ function buildPublicChampionSnapshot(u: any) {
   };
 }
 
+async function sendWinnerEmail({
+  toEmail,
+  name,
+  dateKey,
+  profileUrl,
+}: {
+  toEmail: string;
+  name: string;
+  dateKey: string;
+  profileUrl: string;
+}) {
+  const client = new postmark.ServerClient(POSTMARK_SERVER_TOKEN.value());
+  const html = `
+    <div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.5;">
+      <p style="margin:0 0 16px;">
+        <img src="https://worldsmostinteresting.com/brand/wmi-logo-header.png" alt="World's Most Interesting" style="height:36px;width:auto;" />
+      </p>
+      <h2 style="margin:0 0 12px;font-size:22px;">You’re Wearing the Crown</h2>
+      <p style="margin:0 0 8px;">${name || "Champion"}, you are today’s Most Interesting Person (${dateKey}).</p>
+      <p style="margin:0 0 20px;">Your profile is now featured on the site.</p>
+      <a href="${profileUrl}" style="display:inline-block;padding:10px 16px;border-radius:9999px;border:1px solid #cbd5e1;background:#ffffff;color:#0f172a;text-decoration:none;font-weight:600;">
+        View your crown
+      </a>
+    </div>
+  `;
+  const text = `${name || "Champion"}, you are today's Most Interesting Person (${dateKey}).\n\nYour profile is now featured on the site.\n\nView your crown: ${profileUrl}`;
+
+  await client.sendEmail({
+    From: "crown@worldsmostinteresting.com",
+    To: toEmail,
+    Subject: "You're Wearing the Crown - Today's Most Interesting Person",
+    HtmlBody: html,
+    TextBody: text,
+  });
+}
+
 async function clearLock(crownRef: FirebaseFirestore.DocumentReference) {
   await crownRef.set(
     {
@@ -89,7 +127,7 @@ export const settleCrownNightly = onSchedule(
   {
     schedule: "5 0 * * *", // 12:05 AM
     timeZone: "America/Chicago",
-    secrets: [STRIPE_SECRET_KEY],
+    secrets: [STRIPE_SECRET_KEY, POSTMARK_SERVER_TOKEN],
   },
   async () => {
     const db = admin.firestore();
@@ -302,6 +340,41 @@ export const settleCrownNightly = onSchedule(
             dateKey,
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
           });
+
+          const crownSnap = await crownRef.get();
+          const crownData = crownSnap.exists ? (crownSnap.data() as any) : {};
+          if (crownData.lastWinnerEmailSentForDate === dateKey) {
+            console.log("settleCrownNightly winner email already sent for date", { uid, dateKey });
+          } else {
+            const toEmail = pickString(freshUser, ["email"]);
+            if (!toEmail) {
+              console.log("settleCrownNightly winner email skipped (missing email)", { uid, dateKey });
+            } else {
+              try {
+                await sendWinnerEmail({
+                  toEmail,
+                  name: snapshot.currentChampionName,
+                  dateKey,
+                  profileUrl: "https://worldsmostinteresting.com/",
+                });
+                await crownRef.set(
+                  {
+                    lastWinnerEmailSentForDate: dateKey,
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                  },
+                  { merge: true }
+                );
+                console.log("settleCrownNightly winner email sent", { uid, email: toEmail, dateKey });
+              } catch (err: any) {
+                console.error("settleCrownNightly winner email failed", {
+                  uid,
+                  email: toEmail,
+                  dateKey,
+                  err: err?.message || err,
+                });
+              }
+            }
+          }
 
           await clearLock(crownRef);
           return;

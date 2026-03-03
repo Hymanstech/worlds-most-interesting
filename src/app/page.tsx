@@ -71,32 +71,32 @@ export default function HomePage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
       {/* Top page intro */}
-      <div className="mb-8">
-        <p className="text-[11px] font-semibold tracking-[0.25em] text-emerald-600">
+      <div className="mb-9">
+        <p className="text-[11px] font-semibold tracking-[0.18em] text-slate-500">
           DAILY CROWN
         </p>
 
-        <div className="mt-3 flex items-end justify-between gap-4">
-          <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
+        <div className="mt-2 flex items-end justify-between gap-4">
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
             Today&apos;s Most Interesting Person
           </h1>
 
           <Link
             href="/how-it-works"
-            className="hidden text-xs font-semibold text-slate-500 hover:text-slate-800 sm:inline-block"
+            className="hidden text-xs font-semibold text-slate-500 underline-offset-4 transition-opacity hover:opacity-75 sm:inline-block"
           >
             How it works →
           </Link>
         </div>
 
-        <p className="mt-3 max-w-3xl text-sm text-slate-600">
+        <p className="mt-4 max-w-3xl text-sm text-slate-600">
           One person. One day. Their face and story, front and center.
         </p>
 
         <div className="mt-3 sm:hidden">
           <Link
             href="/how-it-works"
-            className="text-xs font-semibold text-slate-500 hover:text-slate-800"
+            className="text-xs font-semibold text-slate-500 underline-offset-4 transition-opacity hover:opacity-75"
           >
             How it works →
           </Link>
@@ -128,7 +128,7 @@ export default function HomePage() {
               )}
             </div>
 
-            <span className="shrink-0 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-800">
+            <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold text-slate-700">
               👑 Wearing the crown
             </span>
           </div>
@@ -183,7 +183,7 @@ export default function HomePage() {
 
             <Link
               href="/how-it-works"
-              className="rounded-full bg-slate-900 px-4 py-2 text-[11px] font-semibold text-white hover:bg-slate-800"
+              className="rounded-full border border-slate-300 bg-white px-4 py-2 text-[11px] font-semibold text-slate-800 transition-colors hover:bg-slate-50"
             >
               Learn the rules →
             </Link>

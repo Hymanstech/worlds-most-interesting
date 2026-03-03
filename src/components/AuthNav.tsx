@@ -47,14 +47,14 @@ export default function AuthNav() {
   if (user) {
     return (
       <nav className="flex gap-4 text-sm">
-        <Link href="/dashboard" className="text-slate-600 hover:text-emerald-600">
+        <Link href="/dashboard" className="text-slate-600 underline-offset-4 transition-opacity hover:opacity-75">
           Dashboard
         </Link>
 
         <button
           type="button"
           onClick={handleLogout}
-          className="text-slate-400 hover:text-slate-700"
+          className="text-slate-500 underline-offset-4 transition-opacity hover:opacity-75"
         >
           Log out
         </button>
@@ -64,10 +64,10 @@ export default function AuthNav() {
 
   return (
     <nav className="flex gap-4 text-sm">
-      <Link href="/signup" className="text-slate-600 hover:text-emerald-600">
+      <Link href="/signup" className="text-slate-600 underline-offset-4 transition-opacity hover:opacity-75">
         Become the One
       </Link>
-      <Link href="/login" className="text-slate-400 hover:text-slate-700">
+      <Link href="/login" className="text-slate-500 underline-offset-4 transition-opacity hover:opacity-75">
         Login
       </Link>
     </nav>

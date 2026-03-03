@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import AuthNav from '@/components/AuthNav';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export const metadata: Metadata = {
   title: "World's Most Interesting Person",
@@ -20,12 +21,17 @@ export default function RootLayout({
       <body className="min-h-screen bg-slate-100 text-slate-900 antialiased">
         <div className="flex min-h-screen flex-col">
           {/* Header */}
-          <header className="border-b border-slate-200 bg-white">
-            <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
-              <Link href="/" className="flex items-center gap-2">
-                <span className="text-lg font-semibold tracking-tight hover:text-emerald-600">
-                  World&apos;s Most Interesting
-                </span>
+          <header className="border-b border-slate-200/70 bg-white">
+            <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:py-5">
+              <Link href="/" className="flex items-center opacity-95 transition-opacity hover:opacity-100">
+                <Image
+                  src="/brand/wmi-logo-header.png"
+                  alt="World's Most Interesting"
+                  width={320}
+                  height={64}
+                  priority
+                  className="h-12 w-auto"
+                />
               </Link>
 
               {/* Auth-aware nav */}
