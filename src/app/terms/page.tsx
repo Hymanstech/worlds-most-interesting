@@ -44,33 +44,47 @@ export default function TermsPage() {
           <h2 className="text-lg font-bold text-slate-900">4. Content Guidelines</h2>
           <p className="mt-2">To keep things fun and respectful, the following content is not allowed:</p>
           <ul className="mt-2 list-disc space-y-2 pl-5">
-            <li>Vulgar, hateful, or explicit language</li>
+            <li>Derogatory, vulgar, hateful, or explicit language</li>
             <li>Nudity or sexually explicit imagery</li>
-            <li>Harassment, threats, or targeting of individuals or groups</li>
+            <li>Bullying, harassment, threats, or targeting of individuals or groups</li>
             <li>Illegal, deceptive, or misleading content</li>
           </ul>
-          <p className="mt-2">We reserve the right to remove or replace any content at our sole discretion without refund.</p>
+          <p className="mt-2">
+            You may promote yourself or another person, but you are responsible for what you submit. Content that is
+            inappropriate, abusive, or harmful will be removed. We reserve the right to remove or replace any content
+            at our sole discretion without refund.
+          </p>
         </section>
 
         <section>
-          <h2 className="text-lg font-bold text-slate-900">5. Content Rights</h2>
+          <h2 className="text-lg font-bold text-slate-900">5. Profile Limits Per Email</h2>
+          <p className="mt-2">
+            Each email address may have only one active profile identity: one name, one bio, and one primary photo.
+            We may remove duplicate or conflicting profile data at our discretion.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-lg font-bold text-slate-900">6. Content Rights & Promotion Use</h2>
           <p className="mt-2">
             By submitting your name, bio, photo, or any other information, you grant us a
             <strong> perpetual, irrevocable, royalty-free right</strong> to use, reproduce, modify, display,
-            distribute, sell, and share that content for any purpose, including marketing and social media.
+            distribute, and share that content for any purpose, including marketing this platform on social media and
+            other channels.
           </p>
         </section>
 
         <section>
-          <h2 className="text-lg font-bold text-slate-900">6. Account Termination</h2>
+          <h2 className="text-lg font-bold text-slate-900">7. Enforcement</h2>
           <p className="mt-2">
-            We reserve the right to suspend or terminate accounts at any time for violations of these terms or for
-            behavior that undermines the spirit of the platform.
+            We reserve the right to remove content, suspend or terminate accounts, and ban users for violations of
+            these terms or behavior that undermines the uplifting purpose of the platform. Where legally permitted, we
+            may also seek fees, penalties, or other recovery related to abuse, fraud, or damage caused to the service.
           </p>
         </section>
 
         <section>
-          <h2 className="text-lg font-bold text-slate-900">7. Limitation of Liability</h2>
+          <h2 className="text-lg font-bold text-slate-900">8. Limitation of Liability</h2>
           <p className="mt-2">This service is provided "as is." We are not responsible for lost data or missed opportunities.</p>
         </section>
       </div>

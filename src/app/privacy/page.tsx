@@ -32,21 +32,30 @@ export default function PrivacyPage() {
             <li>Feature you as a champion</li>
             <li>Process payments</li>
             <li>Market or promote the platform</li>
-            <li>Share content on social media or other platforms</li>
-            <li>Sell or distribute data to third parties</li>
+            <li>Share your submitted content (including name, bio, photos, and similar profile details) on social media and other platforms to promote the site</li>
+            <li>Enforce our rules and moderate content</li>
           </ul>
         </section>
 
         <section>
-          <h2 className="text-lg font-bold text-slate-900">3. Sharing & Selling Data</h2>
+          <h2 className="text-lg font-bold text-slate-900">3. Sharing Data for Promotion</h2>
           <p className="mt-2">
-            You acknowledge and agree that we may share, license, or sell any information you provide - including
-            your name, email, bio, photos, and other content - to third parties for any purpose.
+            You acknowledge and agree that we may share your submitted profile content for promotional purposes,
+            including reposting or featuring it on social media and partner channels related to World's Most
+            Interesting.
           </p>
         </section>
 
         <section>
-          <h2 className="text-lg font-bold text-slate-900">4. Photos & Media</h2>
+          <h2 className="text-lg font-bold text-slate-900">4. Profile Identity Limits</h2>
+          <p className="mt-2">
+            Each email address is limited to one active profile identity: one name, one bio, and one primary photo.
+            You may submit content for yourself or another person, but abusive or misleading submissions may be removed.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-lg font-bold text-slate-900">5. Photos & Media</h2>
           <p className="mt-2">
             Photos uploaded to this platform may be reused, edited, shared, or redistributed without compensation.
             You should only upload content you have the legal right to share.
@@ -54,15 +63,23 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-bold text-slate-900">5. Data Removal</h2>
+          <h2 className="text-lg font-bold text-slate-900">6. Content Moderation & Safety</h2>
           <p className="mt-2">
-            You may request account deletion, but previously shared, sold, or published content may remain in
+            We may remove content that includes derogatory statements, inappropriate photos, bullying, harassment, or
+            other harmful behavior. We may also suspend or ban accounts that violate these standards.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-lg font-bold text-slate-900">7. Data Removal</h2>
+          <p className="mt-2">
+            You may request account deletion, but previously shared or published content may remain in
             circulation and cannot be fully retracted.
           </p>
         </section>
 
         <section>
-          <h2 className="text-lg font-bold text-slate-900">6. Security</h2>
+          <h2 className="text-lg font-bold text-slate-900">8. Security</h2>
           <p className="mt-2">
             We take reasonable measures to protect your information, but no system is completely secure. Use the site
             at your own risk.
@@ -70,7 +87,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-bold text-slate-900">7. Policy Changes</h2>
+          <h2 className="text-lg font-bold text-slate-900">9. Policy Changes</h2>
           <p className="mt-2">
             This policy may change at any time. Continued use of the site means you accept the current version.
           </p>
