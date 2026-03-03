@@ -14,6 +14,7 @@ import {
   where,
   serverTimestamp,
 } from 'firebase/firestore';
+import PageHeader from '@/components/PageHeader';
 
 type UserProfile = {
   fullName?: string;
@@ -108,7 +109,7 @@ export default function DashboardPage() {
           setCurrentHighestCrownPrice(null);
         }
 
-        // ✅ Make sure this user has a queueEntry doc (safe)
+        //  Make sure this user has a queueEntry doc (safe)
         await syncQueueEntryForCurrentUser();
 
         // 3) Queue position within your price tier (PUBLIC queueEntries)
@@ -195,7 +196,7 @@ export default function DashboardPage() {
           : prev
       );
 
-      // ✅ Sync queueEntries (server writes)
+      //  Sync queueEntries (server writes)
       await syncQueueEntryForCurrentUser();
 
       // Refresh queue display from queueEntries
@@ -288,17 +289,17 @@ export default function DashboardPage() {
 
   if (loading && !userProfile) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-10">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">Your Crown Dashboard</h1>
-        <p className="mt-3 text-sm text-slate-600">Loading your profile…</p>
+      <div className="wmi-container wmi-section max-w-3xl">
+        <PageHeader kicker="Dashboard" title="Your crown dashboard" />
+        <p className="mt-3 text-sm text-slate-600">Loading your profile</p>
       </div>
     );
   }
 
   if (error && !userProfile) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-10">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">Your Crown Dashboard</h1>
+      <div className="wmi-container wmi-section max-w-3xl">
+        <PageHeader kicker="Dashboard" title="Your crown dashboard" />
         <p className="mt-3 text-sm text-red-500">{error}</p>
       </div>
     );
@@ -313,7 +314,13 @@ export default function DashboardPage() {
   const showQueueInfo = yourPrice > 0 && userProfile?.isActive;
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10 space-y-8">
+    <div className="wmi-container wmi-section max-w-3xl space-y-8">
+      <PageHeader
+        kicker="Dashboard"
+        title="Your crown dashboard"
+        subtitle="Manage your price, payment status, and queue position."
+      />
+
       <header className="flex items-center gap-4">
         {userProfile?.photoUrl ? (
           <img
@@ -328,12 +335,11 @@ export default function DashboardPage() {
         )}
 
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+          <p className="text-sm font-semibold text-slate-900">
             {userProfile?.fullName || 'Your Crown Dashboard'}
-          </h1>
+          </p>
           <p className="mt-1 text-xs text-slate-500">
-            {userProfile?.email ||
-              'You are logged in and ready to become the World’s Most Interesting Person.'}
+            {userProfile?.email || 'You are logged in and ready to compete for the crown.'}
           </p>
         </div>
       </header>
@@ -374,7 +380,7 @@ export default function DashboardPage() {
             disabled={updatingPrice}
             className="rounded-full bg-emerald-500 px-4 py-1.5 text-[11px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-60"
           >
-            {updatingPrice ? 'Updating…' : 'Update Crown Price'}
+            {updatingPrice ? 'Updating' : 'Update Crown Price'}
           </button>
         </form>
 
@@ -391,7 +397,7 @@ export default function DashboardPage() {
 
           {showQueueInfo && (
             <p className="text-[11px] text-slate-600">
-              You are <span className="font-semibold text-slate-900">#{tierPosition ?? '—'}</span> in line at{' '}
+              You are <span className="font-semibold text-slate-900">#{tierPosition ?? ''}</span> in line at{' '}
               <span className="font-semibold text-slate-900">${yourPrice.toFixed(0)}</span>
               {typeof tierSize === 'number' ? (
                 <>
@@ -455,7 +461,7 @@ export default function DashboardPage() {
             onClick={handleRemoveCard}
             className="mt-2 rounded-full border border-red-300 bg-red-50 px-4 py-1.5 text-[11px] font-semibold text-red-700 hover:bg-red-100 disabled:opacity-60"
           >
-            {removingCard ? 'Removing card…' : 'Remove card & deactivate account'}
+            {removingCard ? 'Removing card' : 'Remove card & deactivate account'}
           </button>
         )}
 
@@ -464,3 +470,6 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+
+

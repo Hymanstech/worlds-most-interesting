@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Crown">
+  <path fill="currentColor" d="
+    M48 196c-6 0-10-5-9-11l18-98c1-7 10-9 15-4l30 30 32-61c3-6 11-6 14 0l32 61 30-30c5-5 14-3 15 4l18 98c1 6-3 11-9 11H48zm18-20h124l-10-56-22 22c-5 5-13 3-16-3l-30-57-30 57c-3 6-11 8-16 3l-22-22-10 56z
+  "/>
+  <path fill="currentColor" d="M64 210h128c6 0 10 4 10 10s-4 10-10 10H64c-6 0-10-4-10-10s4-10 10-10z"/>
+</svg>

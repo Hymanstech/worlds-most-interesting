@@ -101,14 +101,13 @@ async function sendWinnerEmail({
       </a>
     </div>
   `;
-  const text = `${name || "Champion"}, you are today's Most Interesting Person (${dateKey}).\n\nYour profile is now featured on the site.\n\nView your crown: ${profileUrl}`;
 
   await client.sendEmail({
     From: "crown@worldsmostinteresting.com",
     To: toEmail,
-    Subject: "You're Wearing the Crown - Today's Most Interesting Person",
+    Subject: "You’re Wearing the Crown — Today’s Most Interesting Person",
     HtmlBody: html,
-    TextBody: text,
+    MessageStream: "outbound",
   });
 }
 
@@ -355,7 +354,7 @@ export const settleCrownNightly = onSchedule(
                   toEmail,
                   name: snapshot.currentChampionName,
                   dateKey,
-                  profileUrl: "https://worldsmostinteresting.com/",
+                  profileUrl: "https://worldsmostinteresting.com/profile",
                 });
                 await crownRef.set(
                   {

@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { auth, db, storage } from '@/lib/firebaseClient';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import PageHeader from '@/components/PageHeader';
 
 type UserProfile = {
   fullName?: string;
@@ -124,33 +125,24 @@ export default function EditProfilePage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-xl px-4 py-10">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-          Edit Profile
-        </h1>
-        <p className="mt-3 text-sm text-slate-600">Loading…</p>
+      <div className="wmi-container wmi-section max-w-xl">
+        <PageHeader kicker="Profile" title="Edit profile" />
+        <p className="mt-3 text-sm text-slate-600">Loading...</p>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-xl px-4 py-10">
-      <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-        Edit your profile
-      </h1>
+    <div className="wmi-container wmi-section max-w-xl">
+      <PageHeader
+        kicker="Profile"
+        title="Edit your profile"
+        subtitle="Update how you appear when you're crowned."
+      />
 
-      <p className="mt-3 text-sm text-slate-600">
-        Update how you appear when you&apos;re crowned.
-      </p>
-
-      <form
-        onSubmit={handleSubmit}
-        className="mt-6 space-y-6 rounded-2xl border border-slate-200 bg-white p-6 text-xs text-slate-800 shadow-sm"
-      >
+      <form onSubmit={handleSubmit} className="wmi-card mt-6 space-y-6 rounded-2xl p-6 text-xs text-slate-800">
         <div className="grid gap-2">
-          <label className="text-[11px] font-semibold text-slate-800">
-            Full Name
-          </label>
+          <label className="text-[11px] font-semibold text-slate-800">Full Name</label>
           <input
             type="text"
             className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-300"
@@ -160,30 +152,21 @@ export default function EditProfilePage() {
         </div>
 
         <div className="grid gap-2">
-          <label className="text-[11px] font-semibold text-slate-800">
-            Bio
-          </label>
+          <label className="text-[11px] font-semibold text-slate-800">Bio</label>
           <textarea
             rows={4}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-300 resize-none"
+            className="resize-none rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-300"
             value={bio}
             onChange={(e) => setBio(e.target.value)}
           />
         </div>
 
         <div className="grid gap-2">
-          <label className="text-[11px] font-semibold text-slate-800">
-            Profile Photo
-          </label>
+          <label className="text-[11px] font-semibold text-slate-800">Profile Photo</label>
 
           <label className="inline-flex w-fit cursor-pointer items-center justify-center rounded-full bg-slate-900 px-5 py-2 text-[11px] font-semibold text-white hover:bg-slate-800">
             Choose Photo
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handlePhotoChange}
-              className="hidden"
-            />
+            <input type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
           </label>
 
           {photoPreview ? (
@@ -208,7 +191,7 @@ export default function EditProfilePage() {
             disabled={saving}
             className="rounded-full bg-emerald-500 px-5 py-2 text-[11px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-60"
           >
-            {saving ? 'Saving…' : 'Save changes'}
+            {saving ? 'Saving...' : 'Save changes'}
           </button>
 
           <button
@@ -223,3 +206,4 @@ export default function EditProfilePage() {
     </div>
   );
 }
+

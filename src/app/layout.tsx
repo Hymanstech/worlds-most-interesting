@@ -8,7 +8,7 @@ import Image from 'next/image';
 export const metadata: Metadata = {
   title: "World's Most Interesting Person",
   description:
-    'Set your Crown Price and claim the crown as the World’s Most Interesting Person.',
+    "Set your Crown Price and claim the crown as the World's Most Interesting Person.",
 };
 
 export default function RootLayout({
@@ -18,11 +18,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-slate-100 text-slate-900 antialiased">
+      <body className="min-h-screen bg-[var(--wash)] text-[var(--ink)] antialiased">
         <div className="flex min-h-screen flex-col">
-          {/* Header */}
-          <header className="border-b border-slate-200/70 bg-white">
-            <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:py-5">
+          <header className="border-b border-slate-200/60 bg-white">
+            <div className="wmi-container flex items-center justify-between py-4 sm:py-5">
               <Link href="/" className="flex items-center opacity-95 transition-opacity hover:opacity-100">
                 <Image
                   src="/brand/wmi-logo-header.png"
@@ -34,44 +33,29 @@ export default function RootLayout({
                 />
               </Link>
 
-              {/* Auth-aware nav */}
               <AuthNav />
             </div>
           </header>
 
-          {/* Main content */}
-          <main className="flex-1 bg-slate-50">{children}</main>
+          <main className="flex-1 bg-[var(--wash)]">{children}</main>
 
-          {/* Footer */}
-          <footer className="border-t border-slate-200 bg-white">
-            <div className="mx-auto max-w-5xl px-4 py-6 text-xs text-slate-500">
+          <footer className="border-t border-slate-200/70 bg-white">
+            <div className="wmi-container py-6 text-xs text-slate-500">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                {/* Left: copyright */}
-                <div>
-                  © {new Date().getFullYear()} World&apos;s Most Interesting Person
-                </div>
+                <div>(c) {new Date().getFullYear()} World&apos;s Most Interesting Person</div>
 
-                {/* Right: footer links */}
-                <nav className="flex flex-wrap gap-x-4 gap-y-2">
-                  <Link
-                    href="/how-it-works"
-                    className="hover:text-slate-800"
-                  >
+                <nav className="flex flex-wrap gap-x-4 gap-y-2 text-[11px] font-semibold uppercase tracking-[0.08em]">
+                  <Link href="/how-it-works" className="transition-opacity hover:opacity-70">
                     How it works
                   </Link>
-
-                  <Link
-                    href="/terms"
-                    className="hover:text-slate-800"
-                  >
+                  <Link href="/terms" className="transition-opacity hover:opacity-70">
                     Terms
                   </Link>
-
-                  <Link
-                    href="/privacy"
-                    className="hover:text-slate-800"
-                  >
+                  <Link href="/privacy" className="transition-opacity hover:opacity-70">
                     Privacy
+                  </Link>
+                  <Link href="/contact" className="transition-opacity hover:opacity-70">
+                    Contact
                   </Link>
                 </nav>
               </div>
@@ -82,3 +66,4 @@ export default function RootLayout({
     </html>
   );
 }
+

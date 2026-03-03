@@ -33,7 +33,7 @@ export default function AuthNav() {
   async function handleLogout() {
     try {
       await signOut(auth);
-      router.push('/'); // ✅ redirect to home
+      router.push('/'); //  redirect to home
     } catch (err) {
       console.error('Logout failed:', err);
     }
@@ -46,15 +46,15 @@ export default function AuthNav() {
 
   if (user) {
     return (
-      <nav className="flex gap-4 text-sm">
-        <Link href="/dashboard" className="text-slate-600 underline-offset-4 transition-opacity hover:opacity-75">
+      <nav className="flex items-center gap-5 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">
+        <Link href="/dashboard" className="transition-opacity hover:opacity-70">
           Dashboard
         </Link>
 
         <button
           type="button"
           onClick={handleLogout}
-          className="text-slate-500 underline-offset-4 transition-opacity hover:opacity-75"
+          className="text-slate-500 transition-opacity hover:opacity-70"
         >
           Log out
         </button>
@@ -63,13 +63,14 @@ export default function AuthNav() {
   }
 
   return (
-    <nav className="flex gap-4 text-sm">
-      <Link href="/signup" className="text-slate-600 underline-offset-4 transition-opacity hover:opacity-75">
+    <nav className="flex items-center gap-5 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">
+      <Link href="/signup" className="transition-opacity hover:opacity-70">
         Become the One
       </Link>
-      <Link href="/login" className="text-slate-500 underline-offset-4 transition-opacity hover:opacity-75">
+      <Link href="/login" className="text-slate-500 transition-opacity hover:opacity-70">
         Login
       </Link>
     </nav>
   );
 }
+

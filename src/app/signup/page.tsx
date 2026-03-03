@@ -17,8 +17,9 @@ import {
   updateProfile,
   User,
 } from 'firebase/auth';
+import PageHeader from '@/components/PageHeader';
 
-// ✅ Best practice: version your legal docs so you can require re-acceptance later if needed.
+//  Best practice: version your legal docs so you can require re-acceptance later if needed.
 const TERMS_VERSION = '2026-01-07';
 const PRIVACY_VERSION = '2026-01-07';
 
@@ -86,7 +87,7 @@ export default function SignupPage() {
     try {
       let userCred;
 
-      // ✅ Common acceptance fields (stored at time of signup/login)
+      //  Common acceptance fields (stored at time of signup/login)
       const acceptanceFields = {
         isAdult: true,
         acceptTerms: true,
@@ -130,7 +131,7 @@ export default function SignupPage() {
           const user = userCred.user;
 
           // Update basic info in Firestore (merge, don't overwrite everything)
-          // ✅ Also store acceptance + timestamps (because they explicitly agreed on this screen)
+          //  Also store acceptance + timestamps (because they explicitly agreed on this screen)
           await setDoc(
             doc(db, 'users', user.uid),
             {
@@ -142,7 +143,7 @@ export default function SignupPage() {
             { merge: true }
           );
         } else {
-          // Any other auth error → show a friendly message
+          // Any other auth error  show a friendly message
           if (err?.code === 'auth/invalid-email') {
             setError('Please enter a valid email address.');
           } else if (err?.code === 'auth/weak-password') {
@@ -183,19 +184,16 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="mx-auto max-w-xl px-4 py-10">
-      <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-        Create your account
-      </h1>
-
-      <p className="mt-3 text-sm text-slate-600">
-        Start by creating an account. You&apos;ll set your Crown Price and add your
-        card on the next steps. You won&apos;t be charged unless you&apos;re crowned.
-      </p>
+    <div className="wmi-container wmi-section max-w-xl">
+      <PageHeader
+        kicker="Account"
+        title="Create your account"
+        subtitle="Start by creating an account. You will set your Crown Price and card in the next steps."
+      />
 
       <form
         onSubmit={handleSubmit}
-        className="mt-6 space-y-4 rounded-2xl border border-slate-200 bg-white p-6 text-xs text-slate-800 shadow-sm"
+        className="wmi-card mt-6 space-y-4 rounded-2xl p-6 text-xs text-slate-800"
       >
         <div className="grid gap-2">
           <label className="text-[11px] font-semibold text-slate-800">
@@ -298,9 +296,10 @@ export default function SignupPage() {
           disabled={loading}
           className="mt-2 rounded-full bg-emerald-500 px-5 py-2 text-[11px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-60"
         >
-          {loading ? 'Creating your account…' : 'Continue'}
+          {loading ? 'Creating your account' : 'Continue'}
         </button>
       </form>
     </div>
   );
 }
+

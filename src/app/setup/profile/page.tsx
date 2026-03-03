@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { db, storage, auth } from '@/lib/firebaseClient';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import PageHeader from '@/components/PageHeader';
 
 export default function ProfileSetupPage() {
   const router = useRouter();
@@ -97,19 +98,16 @@ export default function ProfileSetupPage() {
   }
 
   return (
-    <div className="mx-auto max-w-xl px-4 py-10">
-      <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-        Set up your Crown Profile
-      </h1>
-
-      <p className="mt-3 text-sm text-slate-600">
-        Choose a daily Crown Price, upload your photo, and write a short bio.
-        This is what the world will see when you are crowned.
-      </p>
+    <div className="wmi-container wmi-section max-w-xl">
+      <PageHeader
+        kicker="Setup"
+        title="Set up your crown profile"
+        subtitle="Choose a daily Crown Price, upload your photo, and write a short bio."
+      />
 
       <form
         onSubmit={handleSubmit}
-        className="mt-6 space-y-6 rounded-2xl border border-slate-200 bg-white p-6 text-xs text-slate-800 shadow-sm"
+        className="wmi-card mt-6 space-y-6 rounded-2xl p-6 text-xs text-slate-800"
       >
         <div className="grid gap-2">
           <label className="text-[11px] font-semibold text-slate-800">
@@ -182,9 +180,10 @@ export default function ProfileSetupPage() {
           disabled={loading}
           className="rounded-full bg-emerald-500 px-5 py-2 text-[11px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-60"
         >
-          {loading ? 'Saving profile…' : 'Continue to Authorization'}
+          {loading ? 'Saving profile' : 'Continue to Authorization'}
         </button>
       </form>
     </div>
   );
 }
+

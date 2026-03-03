@@ -1,26 +1,66 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --ink: #0b1220;
+  --muted: #64748b;
+  --paper: #ffffff;
+  --wash: #f6f8fb;
+  --gold: #c9a227;
+  --ring: rgba(15, 23, 42, 0.08);
+  --shadow: 0 8px 30px rgba(15, 23, 42, 0.06);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--wash);
+  --color-foreground: var(--ink);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--wash);
+  color: var(--ink);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+.wmi-container {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+.wmi-section {
+  padding-top: 40px;
+  padding-bottom: 40px;
+}
+
+.wmi-card {
+  background: var(--paper);
+  border: 1px solid var(--ring);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+}
+
+.wmi-kicker {
+  font-size: 11px;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.wmi-h1 {
+  color: var(--ink);
+  font-size: clamp(1.75rem, 2.8vw, 2.5rem);
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  font-weight: 600;
+}
+
+.wmi-body {
+  color: var(--muted);
+  line-height: 1.65;
+}
+

@@ -11,6 +11,7 @@ import { stripePromise } from '@/lib/stripeClient';
 import PaymentForm from './payment-form';
 import { auth } from '@/lib/firebaseClient';
 import { onAuthStateChanged } from 'firebase/auth';
+import PageHeader from '@/components/PageHeader';
 
 export default function PaymentSetupPage() {
   const router = useRouter();
@@ -73,21 +74,17 @@ export default function PaymentSetupPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-xl px-4 py-10">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-          Payment Authorization
-        </h1>
-        <p className="mt-3 text-sm text-slate-600">Preparing secure checkout…</p>
+      <div className="wmi-container wmi-section max-w-xl">
+        <PageHeader kicker="Setup" title="Payment authorization" />
+        <p className="mt-3 text-sm text-slate-600">Preparing secure checkout...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="mx-auto max-w-xl px-4 py-10">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-          Payment Authorization
-        </h1>
+      <div className="wmi-container wmi-section max-w-xl">
+        <PageHeader kicker="Setup" title="Payment authorization" />
         <p className="mt-3 text-sm text-red-500">{error}</p>
 
         <button
@@ -102,10 +99,8 @@ export default function PaymentSetupPage() {
 
   if (!clientSecret || !customerId || !options) {
     return (
-      <div className="mx-auto max-w-xl px-4 py-10">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-          Payment Authorization
-        </h1>
+      <div className="wmi-container wmi-section max-w-xl">
+        <PageHeader kicker="Setup" title="Payment authorization" />
         <p className="mt-3 text-sm text-red-500">
           Missing Stripe setup information. Please try again.
         </p>
@@ -114,16 +109,14 @@ export default function PaymentSetupPage() {
   }
 
   return (
-    <div className="mx-auto max-w-xl px-4 py-10">
-      <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-        Payment Authorization
-      </h1>
+    <div className="wmi-container wmi-section max-w-xl">
+      <PageHeader
+        kicker="Setup"
+        title="Payment authorization"
+        subtitle="Add a card to activate your account. You are only charged if you win the crown."
+      />
 
-      <p className="mt-3 text-sm text-slate-600">
-        Add a card to activate your account. You will only be charged if you win the crown.
-      </p>
-
-      <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 text-xs text-slate-800 shadow-sm">
+      <div className="wmi-card mt-6 rounded-2xl p-6 text-xs text-slate-800">
         <Elements stripe={stripePromise} options={options}>
           <PaymentForm customerId={customerId} />
         </Elements>
@@ -131,3 +124,4 @@ export default function PaymentSetupPage() {
     </div>
   );
 }
+
