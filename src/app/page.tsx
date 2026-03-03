@@ -86,7 +86,7 @@ export default function HomePage() {
       />
 
       <p className="mb-8 mt-[-20px] text-[11px] font-medium tracking-[0.02em] text-slate-500">
-        Charged via Stripe &bull; Winner selected nightly &bull; Featured for 24 hours
+        Winner selected nightly &bull; Featured for 24 hours
       </p>
 
       <section className="wmi-card overflow-hidden rounded-[2rem] border-slate-200/70">
