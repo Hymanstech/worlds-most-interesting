@@ -3,7 +3,7 @@ import { defineSecret } from "firebase-functions/params";
 import { setGlobalOptions } from "firebase-functions/v2";
 import * as admin from "firebase-admin";
 import Stripe from "stripe";
-import postmark from "postmark";
+import { ServerClient } from "postmark";
 
 admin.initializeApp();
 
@@ -87,7 +87,7 @@ async function sendWinnerEmail({
   dateKey: string;
   profileUrl: string;
 }) {
-  const client = new postmark.ServerClient(POSTMARK_SERVER_TOKEN.value());
+  const client = new ServerClient(POSTMARK_SERVER_TOKEN.value());
   const html = `
     <div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.5;">
       <p style="margin:0 0 16px;">
