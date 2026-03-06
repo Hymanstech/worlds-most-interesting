@@ -3,7 +3,7 @@ import { defineSecret } from "firebase-functions/params";
 import { setGlobalOptions } from "firebase-functions/v2";
 import * as admin from "firebase-admin";
 import Stripe from "stripe";
-import { ServerClient } from "postmark";
+import * as postmark from "postmark";
 
 admin.initializeApp();
 
@@ -87,7 +87,12 @@ async function sendWinnerEmail({
   dateKey: string;
   profileUrl: string;
 }) {
-  const client = new ServerClient(POSTMARK_SERVER_TOKEN.value());
+  const ServerClientCtor =
+    (postmark as any).ServerClient || (postmark as any).default?.ServerClient;
+  if (!ServerClientCtor) {
+    throw new Error("Postmark ServerClient constructor not found (import mismatch).");
+  }
+  const client = new ServerClientCtor(POSTMARK_SERVER_TOKEN.value());
   const html = `
     <div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.5;">
       <p style="margin:0 0 16px;">
