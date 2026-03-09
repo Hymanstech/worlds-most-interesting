@@ -1,4 +1,5 @@
 import { onSchedule } from "firebase-functions/v2/scheduler";
+import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { defineSecret } from "firebase-functions/params";
 import { setGlobalOptions } from "firebase-functions/v2";
 import * as admin from "firebase-admin";
@@ -76,6 +77,24 @@ function buildPublicChampionSnapshot(u: any) {
   };
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function getPostmarkClient() {
+  const ServerClientCtor =
+    (postmark as any).ServerClient || (postmark as any).default?.ServerClient;
+  if (!ServerClientCtor) {
+    throw new Error("Postmark ServerClient constructor not found (import mismatch).");
+  }
+  return new ServerClientCtor(POSTMARK_SERVER_TOKEN.value());
+}
+
 async function sendWinnerEmail({
   toEmail,
   name,
@@ -87,34 +106,212 @@ async function sendWinnerEmail({
   dateKey: string;
   profileUrl: string;
 }) {
-  const ServerClientCtor =
-    (postmark as any).ServerClient || (postmark as any).default?.ServerClient;
-  if (!ServerClientCtor) {
-    throw new Error("Postmark ServerClient constructor not found (import mismatch).");
-  }
-  const client = new ServerClientCtor(POSTMARK_SERVER_TOKEN.value());
+  const client = getPostmarkClient();
+  const safeName = escapeHtml((name || "Champion").trim() || "Champion");
+  const safeDate = escapeHtml(dateKey);
+  const safeProfileUrl = encodeURI(profileUrl);
+  const siteUrl = "https://www.worldsmostinteresting.com";
+  const logoUrl = `${siteUrl}/brand/wmi-logo-header.png`;
   const html = `
-    <div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.5;">
-      <p style="margin:0 0 16px;">
-        <img src="https://worldsmostinteresting.com/brand/wmi-logo-header.png" alt="World's Most Interesting" style="height:36px;width:auto;" />
-      </p>
-      <h2 style="margin:0 0 12px;font-size:22px;">You’re Wearing the Crown</h2>
-      <p style="margin:0 0 8px;">${name || "Champion"}, you are today’s Most Interesting Person (${dateKey}).</p>
-      <p style="margin:0 0 20px;">Your profile is now featured on the site.</p>
-      <a href="${profileUrl}" style="display:inline-block;padding:10px 16px;border-radius:9999px;border:1px solid #cbd5e1;background:#ffffff;color:#0f172a;text-decoration:none;font-weight:600;">
-        View your crown
-      </a>
-    </div>
+<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif;color:#0f172a;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f8fafc;padding:24px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:620px;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;">
+            <tr>
+              <td style="padding:24px 24px 18px;background:linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);border-bottom:1px solid #e2e8f0;">
+                <img src="${logoUrl}" alt="World's Most Interesting" width="245" style="display:block;max-width:100%;height:auto;border:0;" />
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px;">
+                <p style="margin:0 0 10px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#64748b;font-weight:700;">
+                  Daily Crown Winner
+                </p>
+                <h1 style="margin:0 0 14px;font-size:30px;line-height:1.15;color:#0f172a;">
+                  You're Wearing the Crown
+                </h1>
+                <p style="margin:0 0 8px;font-size:16px;line-height:1.6;color:#1e293b;">
+                  ${safeName}, you are today's Most Interesting Person (${safeDate}).
+                </p>
+                <p style="margin:0 0 22px;font-size:16px;line-height:1.6;color:#334155;">
+                  Your profile is now featured on the site. Enjoy the spotlight.
+                </p>
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                  <tr>
+                    <td align="center" style="border-radius:999px;background:#0f172a;">
+                      <a href="${safeProfileUrl}" style="display:inline-block;padding:12px 20px;border-radius:999px;color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;">
+                        View your crown
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 24px 22px;">
+                <p style="margin:0;font-size:12px;line-height:1.6;color:#64748b;">
+                  World's Most Interesting
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
   `;
 
   await client.sendEmail({
     From: "crown@worldsmostinteresting.com",
     To: toEmail,
-    Subject: "You’re Wearing the Crown — Today’s Most Interesting Person",
+    Subject: "You're Wearing the Crown - Today's Most Interesting Person",
     HtmlBody: html,
+    TextBody: `${safeName}, you are today's Most Interesting Person (${safeDate}). View your crown: ${safeProfileUrl}`,
     MessageStream: "outbound",
   });
 }
+
+async function sendWelcomeEmail({
+  toEmail,
+  name,
+  setupProfileUrl,
+}: {
+  toEmail: string;
+  name: string;
+  setupProfileUrl: string;
+}) {
+  const client = getPostmarkClient();
+  const safeName = escapeHtml((name || "there").trim() || "there");
+  const safeSetupProfileUrl = encodeURI(setupProfileUrl);
+  const siteUrl = "https://www.worldsmostinteresting.com";
+  const logoUrl = `${siteUrl}/brand/wmi-logo-header.png`;
+  const html = `
+<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif;color:#0f172a;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f8fafc;padding:24px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:620px;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;">
+            <tr>
+              <td style="padding:24px 24px 18px;background:linear-gradient(135deg,#ecfccb 0%,#d9f99d 48%,#f8fafc 100%);border-bottom:1px solid #d9f99d;">
+                <img src="${logoUrl}" alt="World's Most Interesting" width="245" style="display:block;max-width:100%;height:auto;border:0;" />
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px;">
+                <p style="margin:0 0 10px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#3f6212;font-weight:700;">
+                  Welcome
+                </p>
+                <h1 style="margin:0 0 14px;font-size:30px;line-height:1.15;color:#0f172a;">
+                  You're in, ${safeName}
+                </h1>
+                <p style="margin:0 0 8px;font-size:16px;line-height:1.6;color:#1e293b;">
+                  Your World's Most Interesting account is ready.
+                </p>
+                <p style="margin:0 0 18px;font-size:16px;line-height:1.6;color:#334155;">
+                  Next step: set up your profile, choose your crown price, and make yourself impossible to ignore.
+                </p>
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 22px;">
+                  <tr>
+                    <td style="padding:16px 18px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;">
+                      <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#0f172a;">
+                        What to do next
+                      </p>
+                      <p style="margin:0;font-size:14px;line-height:1.6;color:#475569;">
+                        Add a profile photo, write a short bio, and set the amount you're willing to pay to wear the crown.
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                  <tr>
+                    <td align="center" style="border-radius:999px;background:#14532d;">
+                      <a href="${safeSetupProfileUrl}" style="display:inline-block;padding:12px 20px;border-radius:999px;color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;">
+                        Complete your profile
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 24px 22px;">
+                <p style="margin:0;font-size:12px;line-height:1.6;color:#64748b;">
+                  World's Most Interesting
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
+  `;
+
+  await client.sendEmail({
+    From: "crown@worldsmostinteresting.com",
+    To: toEmail,
+    Subject: "Welcome to World's Most Interesting",
+    HtmlBody: html,
+    TextBody: `${safeName}, your account is ready. Complete your profile here: ${safeSetupProfileUrl}`,
+    MessageStream: "outbound",
+  });
+}
+
+export const sendWelcomeEmailOnUserCreate = onDocumentCreated(
+  {
+    document: "users/{uid}",
+    region: "us-central1",
+    secrets: [POSTMARK_SERVER_TOKEN],
+  },
+  async (event) => {
+    const snap = event.data;
+    if (!snap) return;
+
+    const user = snap.data() as Record<string, unknown>;
+    const toEmail = pickString(user, ["email"]);
+    if (!toEmail) {
+      console.log("sendWelcomeEmailOnUserCreate skipped (missing email)", { uid: snap.id });
+      return;
+    }
+
+    const name = pickString(user, ["fullName", "displayName", "name"]);
+
+    try {
+      await sendWelcomeEmail({
+        toEmail,
+        name,
+        setupProfileUrl: "https://www.worldsmostinteresting.com/setup/profile",
+      });
+
+      await snap.ref.set(
+        {
+          welcomeEmailSentAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      console.log("sendWelcomeEmailOnUserCreate sent", {
+        uid: snap.id,
+        email: toEmail,
+      });
+    } catch (err: any) {
+      console.error("sendWelcomeEmailOnUserCreate failed", {
+        uid: snap.id,
+        email: toEmail,
+        err: err?.message || err,
+      });
+      throw err;
+    }
+  }
+);
 
 async function clearLock(crownRef: FirebaseFirestore.DocumentReference) {
   await crownRef.set(
@@ -359,7 +556,7 @@ export const settleCrownNightly = onSchedule(
                   toEmail,
                   name: snapshot.currentChampionName,
                   dateKey,
-                  profileUrl: "https://worldsmostinteresting.com/profile",
+                  profileUrl: "https://www.worldsmostinteresting.com/profile",
                 });
                 await crownRef.set(
                   {
