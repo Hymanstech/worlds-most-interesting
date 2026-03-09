@@ -53,6 +53,8 @@ export async function GET(request: Request) {
       uid: d.id,
       fullName: data.fullName ?? '',
       email: data.email ?? '',
+      instagramHandle: data.instagramHandle ?? '',
+      xHandle: data.xHandle ?? '',
       bio: data.bio ?? '',
       photoUrl: data.photoUrl ?? '',
       crownPrice: typeof data.crownPrice === 'number' ? data.crownPrice : 0,

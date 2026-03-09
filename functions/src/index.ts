@@ -3,6 +3,8 @@ import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { defineSecret } from "firebase-functions/params";
 import { setGlobalOptions } from "firebase-functions/v2";
 import * as admin from "firebase-admin";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import Stripe from "stripe";
 import * as postmark from "postmark";
 
@@ -95,6 +97,13 @@ function getPostmarkClient() {
   return new ServerClientCtor(POSTMARK_SERVER_TOKEN.value());
 }
 
+const LOGO_ATTACHMENT = {
+  Name: "wmi-logo-header.png",
+  Content: readFileSync(join(__dirname, "../assets/wmi-logo-header.png")).toString("base64"),
+  ContentType: "image/png",
+  ContentID: "wmi-logo-header",
+};
+
 async function sendWinnerEmail({
   toEmail,
   name,
@@ -110,8 +119,6 @@ async function sendWinnerEmail({
   const safeName = escapeHtml((name || "Champion").trim() || "Champion");
   const safeDate = escapeHtml(dateKey);
   const safeProfileUrl = encodeURI(profileUrl);
-  const siteUrl = "https://www.worldsmostinteresting.com";
-  const logoUrl = `${siteUrl}/brand/wmi-logo-header.png`;
   const html = `
 <!doctype html>
 <html>
@@ -122,7 +129,7 @@ async function sendWinnerEmail({
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:620px;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;">
             <tr>
               <td style="padding:24px 24px 18px;background:linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);border-bottom:1px solid #e2e8f0;">
-                <img src="${logoUrl}" alt="World's Most Interesting" width="245" style="display:block;max-width:100%;height:auto;border:0;" />
+                <img src="cid:wmi-logo-header" alt="World's Most Interesting" width="245" style="display:block;max-width:100%;height:auto;border:0;" />
               </td>
             </tr>
             <tr>
@@ -171,6 +178,7 @@ async function sendWinnerEmail({
     Subject: "You're Wearing the Crown - Today's Most Interesting Person",
     HtmlBody: html,
     TextBody: `${safeName}, you are today's Most Interesting Person (${safeDate}). View your crown: ${safeProfileUrl}`,
+    Attachments: [LOGO_ATTACHMENT],
     MessageStream: "outbound",
   });
 }
@@ -187,8 +195,6 @@ async function sendWelcomeEmail({
   const client = getPostmarkClient();
   const safeName = escapeHtml((name || "there").trim() || "there");
   const safeSetupProfileUrl = encodeURI(setupProfileUrl);
-  const siteUrl = "https://www.worldsmostinteresting.com";
-  const logoUrl = `${siteUrl}/brand/wmi-logo-header.png`;
   const html = `
 <!doctype html>
 <html>
@@ -199,7 +205,7 @@ async function sendWelcomeEmail({
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:620px;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;">
             <tr>
               <td style="padding:24px 24px 18px;background:linear-gradient(135deg,#ecfccb 0%,#d9f99d 48%,#f8fafc 100%);border-bottom:1px solid #d9f99d;">
-                <img src="${logoUrl}" alt="World's Most Interesting" width="245" style="display:block;max-width:100%;height:auto;border:0;" />
+                <img src="cid:wmi-logo-header" alt="World's Most Interesting" width="245" style="display:block;max-width:100%;height:auto;border:0;" />
               </td>
             </tr>
             <tr>
@@ -260,6 +266,7 @@ async function sendWelcomeEmail({
     Subject: "Welcome to World's Most Interesting",
     HtmlBody: html,
     TextBody: `${safeName}, your account is ready. Complete your profile here: ${safeSetupProfileUrl}`,
+    Attachments: [LOGO_ATTACHMENT],
     MessageStream: "outbound",
   });
 }

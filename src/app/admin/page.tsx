@@ -5,11 +5,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { auth } from '@/lib/firebaseClient';
 import { onAuthStateChanged } from 'firebase/auth';
+import { formatHandle } from '@/lib/socialHandles';
 
 type AdminUserRow = {
   uid: string;
   fullName: string;
   email: string;
+  instagramHandle: string;
+  xHandle: string;
   bio: string;
   photoUrl: string;
   crownPrice: number;
@@ -188,6 +191,8 @@ export default function AdminPage() {
         return (
           r.fullName?.toLowerCase().includes(q) ||
           r.email?.toLowerCase().includes(q) ||
+          r.instagramHandle?.toLowerCase().includes(q) ||
+          r.xHandle?.toLowerCase().includes(q) ||
           r.uid?.toLowerCase().includes(q)
         );
       })
@@ -368,6 +373,7 @@ export default function AdminPage() {
                   <th className="py-2 pr-3">User</th>
                   <th className="py-2 pr-3">Active</th>
                   <th className="py-2 pr-3">Crown Price</th>
+                  <th className="py-2 pr-3">Social</th>
                   <th className="py-2 pr-3">Bio</th>
                   <th className="py-2 pr-3"></th>
                 </tr>
@@ -416,6 +422,13 @@ export default function AdminPage() {
                       </span>
                     </td>
 
+                    <td className="py-3 pr-3 min-w-[180px]">
+                      <div className="space-y-1 text-[11px] text-slate-600">
+                        <div>IG: {formatHandle(u.instagramHandle) || '—'}</div>
+                        <div>X: {formatHandle(u.xHandle) || '—'}</div>
+                      </div>
+                    </td>
+
                     <td className="py-3 pr-3 max-w-[420px]">
                       <div className="text-slate-700 line-clamp-2">{u.bio || '—'}</div>
                     </td>
@@ -433,7 +446,7 @@ export default function AdminPage() {
 
                 {filtered.length === 0 && (
                   <tr>
-                    <td className="py-6 text-slate-500" colSpan={5}>
+                    <td className="py-6 text-slate-500" colSpan={6}>
                       No users match your filters.
                     </td>
                   </tr>

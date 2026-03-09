@@ -8,11 +8,14 @@ import { auth, db, storage } from '@/lib/firebaseClient';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import PageHeader from '@/components/PageHeader';
+import { normalizeSocialHandle } from '@/lib/socialHandles';
 
 type UserProfile = {
   fullName?: string;
   bio?: string;
   photoUrl?: string;
+  instagramHandle?: string;
+  xHandle?: string;
 };
 
 export default function EditProfilePage() {
@@ -20,6 +23,8 @@ export default function EditProfilePage() {
 
   const [fullName, setFullName] = useState('');
   const [bio, setBio] = useState('');
+  const [instagramHandle, setInstagramHandle] = useState('');
+  const [xHandle, setXHandle] = useState('');
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
@@ -49,6 +54,8 @@ export default function EditProfilePage() {
         const data = snap.data() as UserProfile;
         setFullName(data.fullName ?? '');
         setBio(data.bio ?? '');
+        setInstagramHandle(data.instagramHandle ?? '');
+        setXHandle(data.xHandle ?? '');
         setPhotoPreview(data.photoUrl ?? null);
 
         setLoading(false);
@@ -107,6 +114,8 @@ export default function EditProfilePage() {
       const patch: any = {
         fullName: fullName.trim(),
         bio: bio.trim(),
+        instagramHandle: normalizeSocialHandle(instagramHandle),
+        xHandle: normalizeSocialHandle(xHandle),
         updatedAt: serverTimestamp(),
       };
 
@@ -159,6 +168,30 @@ export default function EditProfilePage() {
             value={bio}
             onChange={(e) => setBio(e.target.value)}
           />
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-2">
+            <label className="text-[11px] font-semibold text-slate-800">Instagram Handle</label>
+            <input
+              type="text"
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-300"
+              value={instagramHandle}
+              onChange={(e) => setInstagramHandle(e.target.value)}
+              placeholder="@yourname"
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <label className="text-[11px] font-semibold text-slate-800">X Handle</label>
+            <input
+              type="text"
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-300"
+              value={xHandle}
+              onChange={(e) => setXHandle(e.target.value)}
+              placeholder="@yourname"
+            />
+          </div>
         </div>
 
         <div className="grid gap-2">

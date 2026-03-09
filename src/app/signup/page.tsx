@@ -18,6 +18,7 @@ import {
   User,
 } from 'firebase/auth';
 import PageHeader from '@/components/PageHeader';
+import { normalizeSocialHandle } from '@/lib/socialHandles';
 
 //  Best practice: version your legal docs so you can require re-acceptance later if needed.
 const TERMS_VERSION = '2026-01-07';
@@ -29,6 +30,8 @@ export default function SignupPage() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [instagramHandle, setInstagramHandle] = useState('');
+  const [xHandle, setXHandle] = useState('');
   const [isAdult, setIsAdult] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [acceptPrivacy, setAcceptPrivacy] = useState(false);
@@ -99,6 +102,10 @@ export default function SignupPage() {
         termsAcceptedAt: serverTimestamp(),
         privacyAcceptedAt: serverTimestamp(),
       };
+      const socialFields = {
+        instagramHandle: normalizeSocialHandle(instagramHandle),
+        xHandle: normalizeSocialHandle(xHandle),
+      };
 
       try {
         // Try to create a NEW user
@@ -118,6 +125,7 @@ export default function SignupPage() {
           {
             fullName: fullName.trim(),
             email: user.email,
+            ...socialFields,
             ...acceptanceFields,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
@@ -137,6 +145,7 @@ export default function SignupPage() {
             {
               fullName: fullName.trim(),
               email: user.email ?? email.trim(),
+              ...socialFields,
               ...acceptanceFields,
               updatedAt: serverTimestamp(),
             },
@@ -236,6 +245,38 @@ export default function SignupPage() {
             You&apos;ll use this to log in later and change your Crown Price, card, or profile.
           </p>
         </div>
+
+        <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid gap-2">
+            <label className="text-[11px] font-semibold text-slate-800">
+              Instagram Handle
+            </label>
+            <input
+              type="text"
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-300"
+              value={instagramHandle}
+              onChange={(e) => setInstagramHandle(e.target.value)}
+              placeholder="@yourname"
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <label className="text-[11px] font-semibold text-slate-800">
+              X Handle
+            </label>
+            <input
+              type="text"
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-300"
+              value={xHandle}
+              onChange={(e) => setXHandle(e.target.value)}
+              placeholder="@yourname"
+            />
+          </div>
+        </div>
+
+        <p className="text-[10px] text-slate-500">
+          Optional. Add your public handles so we know who to tag if you win the crown.
+        </p>
 
         <label className="flex items-center gap-2 text-[11px] text-slate-700">
           <input

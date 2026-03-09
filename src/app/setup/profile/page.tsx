@@ -1,24 +1,49 @@
 // src/app/setup/profile/page.tsx
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { db, storage, auth } from '@/lib/firebaseClient';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import PageHeader from '@/components/PageHeader';
+import { normalizeSocialHandle } from '@/lib/socialHandles';
 
 export default function ProfileSetupPage() {
   const router = useRouter();
 
   const [crownPrice, setCrownPrice] = useState('');
   const [bio, setBio] = useState('');
+  const [instagramHandle, setInstagramHandle] = useState('');
+  const [xHandle, setXHandle] = useState('');
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    async function loadExistingHandles() {
+      const user = auth.currentUser;
+      if (!user) return;
+
+      const snap = await getDoc(doc(db, 'users', user.uid));
+      if (!snap.exists()) return;
+
+      const data = snap.data() as {
+        instagramHandle?: string;
+        xHandle?: string;
+      };
+
+      setInstagramHandle(data.instagramHandle ?? '');
+      setXHandle(data.xHandle ?? '');
+    }
+
+    loadExistingHandles().catch((err) => {
+      console.error('Error loading social handles:', err);
+    });
+  }, []);
 
   function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -83,8 +108,10 @@ export default function ProfileSetupPage() {
       // 2) Update Firestore user doc
       await updateDoc(doc(db, 'users', uid), {
         crownPrice: crownPriceNumber,
-        bio,
+        bio: bio.trim(),
         photoUrl,
+        instagramHandle: normalizeSocialHandle(instagramHandle),
+        xHandle: normalizeSocialHandle(xHandle),
         updatedAt: serverTimestamp(),
       });
 
@@ -136,6 +163,38 @@ export default function ProfileSetupPage() {
             placeholder="Tell the world why you're the most interesting..."
           />
         </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-2">
+            <label className="text-[11px] font-semibold text-slate-800">
+              Instagram Handle
+            </label>
+            <input
+              type="text"
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-300"
+              value={instagramHandle}
+              onChange={(e) => setInstagramHandle(e.target.value)}
+              placeholder="@yourname"
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <label className="text-[11px] font-semibold text-slate-800">
+              X Handle
+            </label>
+            <input
+              type="text"
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-300"
+              value={xHandle}
+              onChange={(e) => setXHandle(e.target.value)}
+              placeholder="@yourname"
+            />
+          </div>
+        </div>
+
+        <p className="text-[10px] text-slate-500">
+          Optional. Add your public handles so we can tag you in winner posts.
+        </p>
 
         <div className="grid gap-2">
         <label className="text-[11px] font-semibold text-slate-800">
