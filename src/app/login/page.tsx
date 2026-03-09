@@ -6,8 +6,24 @@ import { useRouter } from 'next/navigation';
 
 import { auth, db } from '@/lib/firebaseClient';
 import { doc, getDoc } from 'firebase/firestore';
-import { signInWithEmailAndPassword, User } from 'firebase/auth';
+import { sendPasswordResetEmail, signInWithEmailAndPassword, User } from 'firebase/auth';
 import PageHeader from '@/components/PageHeader';
+
+function getLoginErrorMessage(code?: string) {
+  switch (code) {
+    case 'auth/user-not-found':
+      return 'No account found with that email.';
+    case 'auth/wrong-password':
+    case 'auth/invalid-credential':
+      return 'Password invalid. Retry it, or reset your password.';
+    case 'auth/invalid-email':
+      return 'Please enter a valid email address.';
+    case 'auth/too-many-requests':
+      return 'Too many login attempts. Wait a bit, then try again or reset your password.';
+    default:
+      return 'Unable to log in right now.';
+  }
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -16,7 +32,9 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
 
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   async function redirectBasedOnProfile(user: User) {
     const userRef = doc(db, 'users', user.uid);
@@ -43,6 +61,7 @@ export default function LoginPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    setNotice(null);
 
     if (!email.trim() || !password.trim()) {
       setError('Please enter your email and password.');
@@ -63,15 +82,37 @@ export default function LoginPage() {
       await redirectBasedOnProfile(user);
     } catch (err: any) {
       console.error('Login error:', err);
-      if (err?.code === 'auth/user-not-found') {
-        setError('No account found with that email.');
-      } else if (err?.code === 'auth/wrong-password') {
-        setError('Incorrect password. Please try again.');
-      } else {
-        setError(err?.message || 'Unable to log in right now.');
-      }
+      setError(getLoginErrorMessage(err?.code));
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleResetPassword() {
+    setError(null);
+    setNotice(null);
+
+    if (!email.trim()) {
+      setError('Enter your email first, then use reset password.');
+      return;
+    }
+
+    setResetting(true);
+
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+      setNotice('Password reset email sent. Check your inbox and spam folder.');
+    } catch (err: any) {
+      console.error('Password reset error:', err);
+      if (err?.code === 'auth/invalid-email') {
+        setError('Please enter a valid email address.');
+      } else if (err?.code === 'auth/user-not-found') {
+        setError('No account found with that email.');
+      } else {
+        setError('Could not send reset email right now. Please try again.');
+      }
+    } finally {
+      setResetting(false);
     }
   }
 
@@ -111,11 +152,27 @@ export default function LoginPage() {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Your password"
           />
+          <div>
+            <button
+              type="button"
+              onClick={handleResetPassword}
+              disabled={resetting}
+              className="text-[10px] font-semibold text-emerald-700 underline underline-offset-2 hover:text-emerald-600 disabled:opacity-60"
+            >
+              {resetting ? 'Sending reset email...' : 'Forgot password? Reset it'}
+            </button>
+          </div>
         </div>
 
         {error && (
           <p className="text-[11px] text-red-500">
             {error}
+          </p>
+        )}
+
+        {notice && (
+          <p className="text-[11px] text-emerald-700">
+            {notice}
           </p>
         )}
 
