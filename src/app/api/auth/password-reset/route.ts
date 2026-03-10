@@ -1,6 +1,33 @@
 import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 
+function getPublicOrigin(request: Request) {
+  const configured =
+    process.env.APP_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    '';
+
+  if (configured.trim()) {
+    return configured.trim().replace(/\/+$/, '');
+  }
+
+  const forwardedProto = request.headers.get('x-forwarded-proto');
+  const forwardedHost = request.headers.get('x-forwarded-host') || request.headers.get('host');
+
+  if (forwardedHost && !/^(localhost|127\.0\.0\.1)(:\d+)?$/i.test(forwardedHost)) {
+    const proto = forwardedProto || 'https';
+    return `${proto}://${forwardedHost}`.replace(/\/+$/, '');
+  }
+
+  const url = new URL(request.url);
+  if (!/^(localhost|127\.0\.0\.1)$/i.test(url.hostname)) {
+    return `${url.protocol}//${url.host}`.replace(/\/+$/, '');
+  }
+
+  return 'https://worldsmostinteresting.com';
+}
+
 function buildResetEmailHtml(resetUrl: string) {
   return `
 <!doctype html>
@@ -90,8 +117,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const url = new URL(request.url);
-    const origin = `${url.protocol}//${url.host}`;
+    const origin = getPublicOrigin(request);
     const generatedLink = await adminAuth.generatePasswordResetLink(email, {
       url: `${origin}/login?reset=1`,
     });
