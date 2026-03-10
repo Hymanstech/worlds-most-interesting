@@ -217,7 +217,7 @@ export default function AdminPage() {
     const token = await getTokenOrRedirect();
     if (!token) return;
 
-    const res = await fetch('/api/admin/assign-crown-now', {
+    let res = await fetch('/api/admin/assign-crown-now', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -226,14 +226,42 @@ export default function AdminPage() {
       body: JSON.stringify({ targetUid }),
     });
 
-    const data = (await res.json().catch(() => ({}))) as any;
+    let data = (await res.json().catch(() => ({}))) as any;
+
+    if (res.status === 409 && Array.isArray(data?.warnings) && data.warnings.length > 0) {
+      const warningText = data.warnings.map((warning: string) => `- ${warning}`).join('\n');
+      const forceConfirmed = window.confirm(
+        `This crown assignment has warnings:
+
+${warningText}
+
+Assign the crown anyway without collecting a successful payment?`
+      );
+
+      if (!forceConfirmed) return;
+
+      res = await fetch('/api/admin/assign-crown-now', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ targetUid, force: true }),
+      });
+
+      data = (await res.json().catch(() => ({}))) as any;
+    }
 
     if (!res.ok) {
       setError(data?.error || 'Failed to assign crown.');
       return;
     }
 
-    setNotice('Crown assigned successfully.');
+    setNotice(
+      data?.forced
+        ? 'Crown assigned with admin override. No successful charge was collected.'
+        : 'Crown assigned successfully.'
+    );
     await refreshAll();
   }
 

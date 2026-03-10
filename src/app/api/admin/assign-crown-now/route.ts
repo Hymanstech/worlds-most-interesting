@@ -24,7 +24,6 @@ async function requireAdmin(request: Request) {
   return decoded.uid;
 }
 
-// Chicago date key (YYYY-MM-DD)
 function chicagoDateKey(d = new Date()) {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Chicago',
@@ -57,7 +56,6 @@ function resolveAmountCents(userDoc: any, bodyAmountCents?: unknown) {
   return null;
 }
 
-// ✅ Build the public snapshot the homepage reads from crownStatus/current
 function buildPublicChampionSnapshot(u: any) {
   const name =
     (typeof u.fullName === 'string' && u.fullName) ||
@@ -84,12 +82,12 @@ export async function POST(request: Request) {
 
     const body = (await request.json().catch(() => ({}))) as any;
     const targetUid = (body?.targetUid as string | undefined) ?? (body?.uid as string | undefined);
+    const force = body?.force === true;
 
     if (!targetUid) {
       return NextResponse.json({ error: 'Missing targetUid' }, { status: 400 });
     }
 
-    // Load target user
     const userRef = adminDb.collection('users').doc(targetUid);
     const userSnap = await userRef.get();
 
@@ -98,25 +96,19 @@ export async function POST(request: Request) {
     }
 
     const u = userSnap.data() as any;
-
     const customerId = u.stripeCustomerId;
-
     const paymentMethodId =
       (typeof u.stripeDefaultPaymentMethodId === 'string' && u.stripeDefaultPaymentMethodId) ||
       (typeof u.defaultPaymentMethodId === 'string' && u.defaultPaymentMethodId) ||
       null;
+    const warnings: string[] = [];
 
     if (!customerId || !paymentMethodId) {
-      return NextResponse.json(
-        {
-          error:
-            'User missing stripeCustomerId or default payment method id (expected stripeDefaultPaymentMethodId or defaultPaymentMethodId).',
-        },
-        { status: 400 }
+      warnings.push(
+        'Missing stripeCustomerId or default payment method id (expected stripeDefaultPaymentMethodId or defaultPaymentMethodId).'
       );
     }
 
-    // optional: normalize for future calls
     if (!u.stripeDefaultPaymentMethodId && paymentMethodId) {
       await adminDb.collection('users').doc(targetUid).set(
         {
@@ -128,88 +120,117 @@ export async function POST(request: Request) {
     }
 
     const amountCents = resolveAmountCents(u, body?.amountCents);
-
     if (!amountCents || !Number.isFinite(amountCents) || amountCents < 50) {
-      return NextResponse.json(
-        { error: 'Invalid or missing crown offer amount (need >= $0.50)' },
-        { status: 400 }
-      );
+      warnings.push('Invalid or missing crown offer amount (need >= $0.50).');
     }
 
     const settleForDate = chicagoDateKey(new Date());
+    let paymentIntent: Stripe.PaymentIntent | null = null;
+    let paymentIntentId: string | null = null;
 
-    // Charge immediately (admin override)
-    const paymentIntent = await stripe.paymentIntents.create(
-      {
-        amount: amountCents,
-        currency: 'usd',
-        customer: customerId,
-        payment_method: paymentMethodId,
-        confirm: true,
-        off_session: true,
-        description: `ADMIN Assign Crown (${settleForDate})`,
-        metadata: {
-          uid: targetUid,
-          settleForDate,
-          purpose: 'crown_admin_assign',
-        },
-      },
-      {
-        idempotencyKey: `admin-assign:${settleForDate}:${targetUid}:${amountCents}`,
-      }
-    );
-
-    if (paymentIntent.status !== 'succeeded') {
-      await adminDb.collection('crown_events').add({
-        type: 'ADMIN_ASSIGN_FAIL',
-        uid: targetUid,
-        amountCents,
-        paymentIntentId: paymentIntent.id,
-        stripeStatus: paymentIntent.status,
-        createdAt: FieldValue.serverTimestamp(),
-      });
-
+    if (warnings.length > 0 && !force) {
       return NextResponse.json(
         {
-          error: 'Charge did not succeed',
-          stripeStatus: paymentIntent.status,
-          paymentIntentId: paymentIntent.id,
+          error: 'Admin override required before assigning this crown.',
+          warnings,
+          canForce: true,
         },
-        { status: 402 }
+        { status: 409 }
       );
     }
 
-    // ✅ Build public snapshot for homepage (Option A)
+    if (warnings.length === 0) {
+      const chargeAmountCents = amountCents as number;
+      try {
+        paymentIntent = await stripe.paymentIntents.create(
+          {
+            amount: chargeAmountCents,
+            currency: 'usd',
+            customer: customerId,
+            payment_method: paymentMethodId,
+            confirm: true,
+            off_session: true,
+            description: `ADMIN Assign Crown (${settleForDate})`,
+            metadata: {
+              uid: targetUid,
+              settleForDate,
+              purpose: 'crown_admin_assign',
+            },
+          },
+          {
+            idempotencyKey: `admin-assign:${settleForDate}:${targetUid}:${chargeAmountCents}`,
+          }
+        );
+
+        paymentIntentId = paymentIntent.id;
+
+        if (paymentIntent.status !== 'succeeded') {
+          warnings.push(`Charge did not succeed (status: ${paymentIntent.status}).`);
+        }
+      } catch (err: any) {
+        warnings.push(`Charge failed: ${err?.message || 'Unknown Stripe error.'}`);
+      }
+    }
+
+    if (warnings.length > 0) {
+      await adminDb.collection('crown_events').add({
+        type: force ? 'ADMIN_ASSIGN_FORCED' : 'ADMIN_ASSIGN_FAIL',
+        uid: targetUid,
+        amountCents: amountCents || 0,
+        paymentIntentId,
+        stripeStatus: paymentIntent?.status || null,
+        error: warnings.join(' '),
+        warnings,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+    }
+
+    if (warnings.length > 0 && !force) {
+      return NextResponse.json(
+        {
+          error: 'Admin override required before assigning this crown.',
+          warnings,
+          canForce: true,
+          paymentIntentId,
+          stripeStatus: paymentIntent?.status || null,
+        },
+        { status: 409 }
+      );
+    }
+
     const snapshot = buildPublicChampionSnapshot(u);
 
-    // ✅ Only set the crown AFTER the charge succeeds
     await adminDb.collection('crownStatus').doc('current').set(
       {
         activeUid: targetUid,
-        activePriceCents: amountCents,
-        activePaymentIntentId: paymentIntent.id,
+        activePriceCents: amountCents || 0,
+        activePaymentIntentId: paymentIntentId,
         activeDateKey: settleForDate,
         activeSince: Timestamp.now(),
-        assignedBy: 'admin',
+        assignedBy: warnings.length > 0 ? 'admin_forced' : 'admin',
         ...snapshot,
         updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true }
     );
 
-    await adminDb.collection('crown_events').add({
-      type: 'ADMIN_ASSIGN_WIN',
-      uid: targetUid,
-      amountCents,
-      paymentIntentId: paymentIntent.id,
-      createdAt: FieldValue.serverTimestamp(),
-    });
+    if (warnings.length === 0) {
+      await adminDb.collection('crown_events').add({
+        type: 'ADMIN_ASSIGN_WIN',
+        uid: targetUid,
+        amountCents,
+        paymentIntentId,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+    }
 
     return NextResponse.json({
       ok: true,
       uid: targetUid,
-      amountCents,
-      paymentIntentId: paymentIntent.id,
+      amountCents: amountCents || 0,
+      paymentIntentId,
+      forced: warnings.length > 0,
+      warnings,
     });
   } catch (err: any) {
     const message = err?.message || 'Server error';
