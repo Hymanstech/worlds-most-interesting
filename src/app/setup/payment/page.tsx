@@ -116,7 +116,7 @@ export default function PaymentSetupPage() {
         subtitle="Add a card to activate your account. You are only charged if you win the crown."
       />
 
-      <div className="wmi-card mt-6 rounded-2xl p-6 text-xs text-slate-800">
+      <div className="wmi-card mt-5 rounded-2xl p-4 text-xs text-slate-800 sm:mt-6 sm:p-6">
         <Elements stripe={stripePromise} options={options}>
           <PaymentForm customerId={customerId} />
         </Elements>

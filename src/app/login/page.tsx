@@ -138,7 +138,7 @@ export default function LoginPage() {
 
       <form
         onSubmit={handleSubmit}
-        className="wmi-card mt-6 space-y-4 rounded-2xl p-6 text-xs text-slate-800"
+        className="wmi-card mt-5 space-y-4 rounded-2xl p-4 text-xs text-slate-800 sm:mt-6 sm:p-6"
       >
         <div className="grid gap-2">
           <label className="text-[11px] font-semibold text-slate-800">

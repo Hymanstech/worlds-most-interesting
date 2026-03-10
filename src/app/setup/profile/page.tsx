@@ -134,7 +134,7 @@ export default function ProfileSetupPage() {
 
       <form
         onSubmit={handleSubmit}
-        className="wmi-card mt-6 space-y-6 rounded-2xl p-6 text-xs text-slate-800"
+        className="wmi-card mt-5 space-y-5 rounded-2xl p-4 text-xs text-slate-800 sm:mt-6 sm:space-y-6 sm:p-6"
       >
         <div className="grid gap-2">
           <label className="text-[11px] font-semibold text-slate-800">
@@ -237,7 +237,7 @@ export default function ProfileSetupPage() {
         <button
           type="submit"
           disabled={loading}
-          className="rounded-full bg-emerald-500 px-5 py-2 text-[11px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-60"
+          className="w-full rounded-full bg-emerald-500 px-5 py-2.5 text-[11px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-60 sm:w-auto sm:py-2"
         >
           {loading ? 'Saving profile' : 'Continue to Authorization'}
         </button>

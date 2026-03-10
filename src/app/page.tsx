@@ -75,6 +75,8 @@ export default function HomePage() {
         kicker="Daily Crown"
         title="Today's Most Interesting Person"
         subtitle="The title is claimed each midnight by Crown Price, then held in full view for one day."
+        subtitleClassName="hidden sm:block"
+        rightSlotClassName="hidden sm:block"
         rightSlot={(
           <Link
             href="/how-it-works"
@@ -85,7 +87,7 @@ export default function HomePage() {
         )}
       />
 
-      <div className="mb-5 mt-[-4px] flex flex-wrap gap-2 text-[11px] font-semibold tracking-[0.03em] text-slate-500 sm:mb-8 sm:mt-[-8px]">
+      <div className="hidden sm:flex sm:mb-8 sm:mt-[-8px] sm:flex-wrap sm:gap-2 sm:text-[11px] sm:font-semibold sm:tracking-[0.03em] sm:text-slate-500">
         <span className="rounded-full border border-slate-200 bg-white/75 px-3 py-1.5">Winner selected nightly</span>
         <span className="rounded-full border border-slate-200 bg-white/75 px-3 py-1.5">Featured for 24 hours</span>
       </div>
