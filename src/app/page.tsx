@@ -85,28 +85,28 @@ export default function HomePage() {
         )}
       />
 
-      <div className="mb-8 mt-[-8px] flex flex-wrap gap-2 text-[11px] font-semibold tracking-[0.03em] text-slate-500">
+      <div className="mb-5 mt-[-4px] flex flex-wrap gap-2 text-[11px] font-semibold tracking-[0.03em] text-slate-500 sm:mb-8 sm:mt-[-8px]">
         <span className="rounded-full border border-slate-200 bg-white/75 px-3 py-1.5">Winner selected nightly</span>
         <span className="rounded-full border border-slate-200 bg-white/75 px-3 py-1.5">Featured for 24 hours</span>
       </div>
 
       <section className="wmi-card overflow-hidden border-slate-200/70">
-        <div className="border-b border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(248,250,252,0.88))] p-6 sm:p-9">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+        <div className="border-b border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(248,250,252,0.88))] p-5 sm:p-9">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-5">
             <div className="min-w-0">
               <p className="text-[10px] font-semibold tracking-[0.24em] text-slate-400">CURRENT M.I.P</p>
 
-              <h2 className="mt-3 text-4xl font-bold tracking-tight text-slate-950 sm:text-5xl">
+              <h2 className="mt-2 text-[2.6rem] font-bold tracking-tight text-slate-950 sm:mt-3 sm:text-5xl">
                 {championName}
               </h2>
 
-              <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate-500 sm:text-base">
+              <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-slate-500 sm:mt-3 sm:text-base">
                 One person holds the crown in full public view until the next nightly selection.
               </p>
 
-              {loading && <p className="mt-3 text-[11px] text-slate-400">Loading today&apos;s champion...</p>}
+              {loading && <p className="mt-2 text-[11px] text-slate-400 sm:mt-3">Loading today&apos;s champion...</p>}
 
-              {error && <p className="mt-3 text-[11px] text-red-600">{error}</p>}
+              {error && <p className="mt-2 text-[11px] text-red-600 sm:mt-3">{error}</p>}
             </div>
 
             <span className="inline-flex shrink-0 self-start rounded-full border border-slate-300/80 bg-white px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-700 shadow-sm">
@@ -115,10 +115,10 @@ export default function HomePage() {
           </div>
         </div>
 
-        <div className="p-5 sm:p-8">
-          <div className="rounded-[1.75rem] border border-slate-200/80 bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] p-4 sm:p-6">
-            <div className="overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-[radial-gradient(circle_at_top,rgba(201,162,39,0.10),rgba(15,23,42,0.02)_45%,rgba(255,255,255,1)_100%)] px-4 py-5 sm:px-6 sm:py-7">
-              <div className="mx-auto flex min-h-[360px] max-w-[680px] items-center justify-center sm:min-h-[520px]">
+        <div className="p-3 sm:p-8">
+          <div className="rounded-[1.5rem] border border-slate-200/80 bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] p-3 sm:rounded-[1.75rem] sm:p-6">
+            <div className="overflow-hidden rounded-[1.35rem] border border-slate-200/80 bg-[radial-gradient(circle_at_top,rgba(201,162,39,0.10),rgba(15,23,42,0.02)_45%,rgba(255,255,255,1)_100%)] px-3 py-3 sm:rounded-[1.5rem] sm:px-6 sm:py-7">
+              <div className="mx-auto flex min-h-[260px] max-w-[920px] items-center justify-center sm:min-h-[520px]">
                 {heroIsVideo ? (
                   <video src={featuredVideoUrl} controls className="h-full max-h-[520px] w-auto max-w-full rounded-[1.25rem] object-contain shadow-[0_20px_50px_rgba(15,23,42,0.18)]" />
                 ) : heroImage ? (
@@ -137,8 +137,8 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="mx-auto mt-6 max-w-4xl">
-            <p className="text-lg leading-9 text-slate-700 sm:text-[1.45rem] sm:leading-10">
+          <div className="mx-auto mt-4 max-w-4xl sm:mt-6">
+            <p className="text-[1.05rem] leading-8 text-slate-700 sm:text-[1.45rem] sm:leading-10">
               {championBio}
             </p>
           </div>
