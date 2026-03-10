@@ -39,14 +39,14 @@ async function requireAdmin(request: Request) {
 
 export async function PATCH(
   request: Request,
-  context: { params: { uid: string } }
+  context: { params: Promise<{ uid: string }> }
 ) {
   const gate = await requireAdmin(request);
   if (!gate.ok) {
     return NextResponse.json({ error: gate.error }, { status: 401 });
   }
 
-  const { uid } = context.params;
+  const { uid } = await context.params;
   if (!uid) {
     return NextResponse.json({ error: 'Missing uid.' }, { status: 400 });
   }
