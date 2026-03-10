@@ -64,6 +64,7 @@ type AdminEvent = {
 type EditDraft = {
   fullName: string;
   bio: string;
+  photoUrl: string;
   instagramHandle: string;
   xHandle: string;
   crownPrice: string;
@@ -270,6 +271,7 @@ Assign the crown anyway without collecting a successful payment?`
     setDraft({
       fullName: user.fullName || '',
       bio: user.bio || '',
+      photoUrl: user.photoUrl || '',
       instagramHandle: user.instagramHandle || '',
       xHandle: user.xHandle || '',
       crownPrice: String(Number.isFinite(user.crownPrice) ? user.crownPrice : 0),
@@ -310,6 +312,7 @@ Assign the crown anyway without collecting a successful payment?`
       body: JSON.stringify({
         fullName: draft.fullName,
         bio: draft.bio,
+        photoUrl: draft.photoUrl,
         instagramHandle: draft.instagramHandle,
         xHandle: draft.xHandle,
         crownPrice,
@@ -705,6 +708,15 @@ Assign the crown anyway without collecting a successful payment?`
                   value={draft.bio}
                   onChange={(e) => setDraft({ ...draft, bio: e.target.value })}
                   className="resize-none rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-300"
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <label className="text-[11px] font-semibold text-slate-800">Photo URL</label>
+                <input
+                  value={draft.photoUrl}
+                  onChange={(e) => setDraft({ ...draft, photoUrl: e.target.value })}
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-300"
                 />
               </div>
 

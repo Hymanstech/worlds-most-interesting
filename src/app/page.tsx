@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebaseClient';
 import PageHeader from '@/components/PageHeader';
 
@@ -26,35 +26,25 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let mounted = true;
+    setError(null);
+    setLoading(true);
 
-    async function load() {
-      try {
-        setError(null);
-        setLoading(true);
-
-        const ref = doc(db, 'crownStatus', 'current');
-        const snap = await getDoc(ref);
-
-        if (!mounted) return;
-
-        if (snap.exists()) setStatus(snap.data() as CrownStatus);
-        else setStatus(null);
-      } catch (e: any) {
+    const ref = doc(db, 'crownStatus', 'current');
+    const unsubscribe = onSnapshot(
+      ref,
+      (snap) => {
+        setStatus(snap.exists() ? (snap.data() as CrownStatus) : null);
+        setLoading(false);
+      },
+      (e: any) => {
         console.error('Homepage load error:', e);
-        if (!mounted) return;
         setError(e?.message || 'Failed to load today\'s champion.');
         setStatus(null);
-      } finally {
-        if (mounted) setLoading(false);
+        setLoading(false);
       }
-    }
+    );
 
-    load();
-
-    return () => {
-      mounted = false;
-    };
+    return () => unsubscribe();
   }, []);
 
   const championName = status?.currentChampionName?.trim() || 'No champion yet';

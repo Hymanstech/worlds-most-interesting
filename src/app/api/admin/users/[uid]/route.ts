@@ -2,6 +2,24 @@ import { NextResponse } from 'next/server';
 import { adminAuth, adminDb, adminFieldValue } from '@/lib/firebaseAdmin';
 import { normalizeSocialHandle } from '@/lib/socialHandles';
 
+function buildPublicChampionSnapshot(user: Record<string, unknown>) {
+  const name =
+    (typeof user.fullName === 'string' && user.fullName.trim()) ||
+    (typeof user.name === 'string' && user.name.trim()) ||
+    'No champion yet';
+  const bio = (typeof user.bio === 'string' && user.bio.trim()) || '';
+  const photoUrl =
+    (typeof user.photoUrl === 'string' && user.photoUrl.trim()) ||
+    (typeof user.profilePhotoUrl === 'string' && user.profilePhotoUrl.trim()) ||
+    '';
+
+  return {
+    currentChampionName: name,
+    currentChampionBio: bio,
+    currentChampionPhotoUrl: photoUrl,
+  };
+}
+
 function isAdminUid(uid: string) {
   const allow = (process.env.ADMIN_UIDS || '')
     .split(',')
@@ -58,6 +76,7 @@ export async function PATCH(
 
   if (typeof body.fullName === 'string') patch.fullName = body.fullName.trim();
   if (typeof body.bio === 'string') patch.bio = body.bio.trim();
+  if (typeof body.photoUrl === 'string') patch.photoUrl = body.photoUrl.trim();
   if (typeof body.instagramHandle === 'string') {
     patch.instagramHandle = normalizeSocialHandle(body.instagramHandle);
   }
@@ -73,7 +92,27 @@ export async function PATCH(
     return NextResponse.json({ error: 'No valid fields provided.' }, { status: 400 });
   }
 
-  await adminDb.collection('users').doc(uid).set(patch, { merge: true });
+  const userRef = adminDb.collection('users').doc(uid);
+  await userRef.set(patch, { merge: true });
+
+  const [userSnap, crownSnap] = await Promise.all([
+    userRef.get(),
+    adminDb.collection('crownStatus').doc('current').get(),
+  ]);
+
+  if (userSnap.exists && crownSnap.exists) {
+    const crown = (crownSnap.data() || {}) as Record<string, unknown>;
+    if (crown.activeUid === uid) {
+      // Keep the public winner snapshot aligned with the live crowned user.
+      await adminDb.collection('crownStatus').doc('current').set(
+        {
+          ...buildPublicChampionSnapshot(userSnap.data() as Record<string, unknown>),
+          updatedAt: adminFieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    }
+  }
 
   return NextResponse.json({ ok: true });
 }
