@@ -18,7 +18,9 @@
 }
 
 body {
-  background: var(--wash);
+  background:
+    radial-gradient(circle at top, rgba(201, 162, 39, 0.08), transparent 28%),
+    linear-gradient(180deg, #f7f8fb 0%, #f3f5f9 100%);
   color: var(--ink);
   font-family: Arial, Helvetica, sans-serif;
 }
@@ -26,20 +28,20 @@ body {
 .wmi-container {
   max-width: 1040px;
   margin: 0 auto;
-  padding-left: 16px;
-  padding-right: 16px;
+  padding-left: 20px;
+  padding-right: 20px;
 }
 
 .wmi-section {
-  padding-top: 40px;
-  padding-bottom: 40px;
+  padding-top: 36px;
+  padding-bottom: 48px;
 }
 
 .wmi-card {
   background: var(--paper);
   border: 1px solid var(--ring);
-  border-radius: 18px;
-  box-shadow: var(--shadow);
+  border-radius: 24px;
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
 }
 
 .wmi-kicker {
@@ -53,14 +55,26 @@ body {
 
 .wmi-h1 {
   color: var(--ink);
-  font-size: clamp(1.75rem, 2.8vw, 2.5rem);
-  line-height: 1.08;
+  font-size: clamp(2.3rem, 5vw, 4.1rem);
+  line-height: 0.98;
   letter-spacing: -0.02em;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .wmi-body {
   color: var(--muted);
   line-height: 1.65;
+}
+
+@media (min-width: 640px) {
+  .wmi-container {
+    padding-left: 28px;
+    padding-right: 28px;
+  }
+
+  .wmi-section {
+    padding-top: 56px;
+    padding-bottom: 64px;
+  }
 }
 

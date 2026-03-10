@@ -21,7 +21,7 @@ export default function RootLayout({
       <body className="min-h-screen bg-[var(--wash)] text-[var(--ink)] antialiased">
         <div className="flex min-h-screen flex-col">
           <header className="border-b border-slate-200/60 bg-white">
-            <div className="wmi-container flex items-center justify-between py-4 sm:py-5">
+            <div className="wmi-container flex flex-col gap-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:py-5">
               <Link href="/" className="flex items-center opacity-95 transition-opacity hover:opacity-100">
                 <Image
                   src="/brand/wmi-logo-header.png"
@@ -29,7 +29,7 @@ export default function RootLayout({
                   width={320}
                   height={64}
                   priority
-                  className="h-12 w-auto"
+                  className="h-11 w-auto sm:h-12"
                 />
               </Link>
 

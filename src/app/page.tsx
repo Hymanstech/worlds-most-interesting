@@ -78,55 +78,70 @@ export default function HomePage() {
         rightSlot={(
           <Link
             href="/how-it-works"
-            className="hidden text-xs font-semibold text-slate-500 underline-offset-4 transition-opacity hover:opacity-75 sm:inline-block"
+            className="inline-flex items-center rounded-full border border-slate-300/80 bg-white/70 px-4 py-2 text-[11px] font-semibold text-slate-600 transition-colors hover:bg-white"
           >
             How it works {'->'}
           </Link>
         )}
       />
 
-      <p className="mb-8 mt-[-20px] text-[11px] font-medium tracking-[0.02em] text-slate-500">
-        Winner selected nightly &bull; Featured for 24 hours
-      </p>
+      <div className="mb-8 mt-[-8px] flex flex-wrap gap-2 text-[11px] font-semibold tracking-[0.03em] text-slate-500">
+        <span className="rounded-full border border-slate-200 bg-white/75 px-3 py-1.5">Winner selected nightly</span>
+        <span className="rounded-full border border-slate-200 bg-white/75 px-3 py-1.5">Featured for 24 hours</span>
+      </div>
 
-      <section className="wmi-card overflow-hidden rounded-[2rem] border-slate-200/70">
-        <div className="border-b border-slate-200/80 p-7 sm:p-9">
-          <div className="flex items-start justify-between gap-4">
+      <section className="wmi-card overflow-hidden border-slate-200/70">
+        <div className="border-b border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(248,250,252,0.88))] p-6 sm:p-9">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold tracking-[0.2em] text-slate-400">CURRENT M.I.P</p>
+              <p className="text-[10px] font-semibold tracking-[0.24em] text-slate-400">CURRENT M.I.P</p>
 
-              <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+              <h2 className="mt-3 text-4xl font-bold tracking-tight text-slate-950 sm:text-5xl">
                 {championName}
               </h2>
 
-              {loading && <p className="mt-2 text-[11px] text-slate-400">Loading today's champion...</p>}
+              <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate-500 sm:text-base">
+                One person holds the crown in full public view until the next nightly selection.
+              </p>
 
-              {error && <p className="mt-2 text-[11px] text-red-600">{error}</p>}
+              {loading && <p className="mt-3 text-[11px] text-slate-400">Loading today&apos;s champion...</p>}
+
+              {error && <p className="mt-3 text-[11px] text-red-600">{error}</p>}
             </div>
 
-            <span className="shrink-0 rounded-full border border-slate-300/70 bg-slate-100/50 px-3 py-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-slate-700">
+            <span className="inline-flex shrink-0 self-start rounded-full border border-slate-300/80 bg-white px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-700 shadow-sm">
               Wearing The Crown
             </span>
           </div>
         </div>
 
-        <div className="p-7 sm:p-9">
-          <div className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white">
-            <div className="aspect-[16/9] w-full bg-white">
-              {heroIsVideo ? (
-                <video src={featuredVideoUrl} controls className="h-full w-full object-contain bg-white" />
-              ) : heroImage ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={heroImage} alt={`${championName} featured`} className="h-full w-full object-contain bg-white" />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center px-6 text-center text-sm text-slate-500">
-                  No photo yet. The next champion will appear here.
-                </div>
-              )}
+        <div className="p-5 sm:p-8">
+          <div className="rounded-[1.75rem] border border-slate-200/80 bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] p-4 sm:p-6">
+            <div className="overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-[radial-gradient(circle_at_top,rgba(201,162,39,0.10),rgba(15,23,42,0.02)_45%,rgba(255,255,255,1)_100%)] px-4 py-5 sm:px-6 sm:py-7">
+              <div className="mx-auto flex min-h-[360px] max-w-[680px] items-center justify-center sm:min-h-[520px]">
+                {heroIsVideo ? (
+                  <video src={featuredVideoUrl} controls className="h-full max-h-[520px] w-auto max-w-full rounded-[1.25rem] object-contain shadow-[0_20px_50px_rgba(15,23,42,0.18)]" />
+                ) : heroImage ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={heroImage}
+                    alt={`${championName} featured`}
+                    className="h-full max-h-[520px] w-auto max-w-full rounded-[1.25rem] object-contain shadow-[0_20px_50px_rgba(15,23,42,0.18)]"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center px-6 text-center text-sm text-slate-500">
+                    No photo yet. The next champion will appear here.
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
-          <p className="mt-7 text-base leading-relaxed text-slate-700">{championBio}</p>
+          <div className="mx-auto mt-6 max-w-4xl">
+            <p className="text-lg leading-9 text-slate-700 sm:text-[1.45rem] sm:leading-10">
+              {championBio}
+            </p>
+          </div>
 
           {(featuredVideoUrl || featuredImageUrl) && championPhoto && (
             <div className="mt-6 rounded-2xl border border-slate-200/80 bg-slate-50 p-4">
@@ -138,15 +153,15 @@ export default function HomePage() {
           )}
         </div>
 
-        <div className="border-t border-slate-200/80 bg-white p-7 sm:p-9">
-          <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-            <p className="text-xs text-slate-600">
-              Think you're more interesting? Here's how to claim the crown.
+        <div className="border-t border-slate-200/80 bg-white p-6 sm:p-8">
+          <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+            <p className="max-w-xl text-sm leading-relaxed text-slate-600">
+              Think you&apos;re more interesting? Set your profile, name your Crown Price, and make the next nightly result about you.
             </p>
 
             <Link
               href="/how-it-works"
-              className="rounded-full border border-slate-300 bg-white px-4 py-2 text-[11px] font-semibold text-slate-800 transition-colors hover:bg-slate-50"
+              className="rounded-full border border-slate-300 bg-slate-900 px-5 py-2.5 text-[11px] font-semibold text-white transition-colors hover:bg-slate-800"
             >
               Learn the rules {'->'}
             </Link>

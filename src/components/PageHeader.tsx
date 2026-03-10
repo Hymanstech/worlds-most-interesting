@@ -9,15 +9,15 @@ type PageHeaderProps = {
 
 export default function PageHeader({ kicker, title, subtitle, rightSlot }: PageHeaderProps) {
   return (
-    <div className="mb-9">
+    <div className="mb-8 sm:mb-10">
       {kicker ? <p className="wmi-kicker">{kicker}</p> : null}
 
-      <div className="mt-2 flex items-end justify-between gap-4">
-        <h1 className="wmi-h1 max-w-2xl">{title}</h1>
-        {rightSlot ? <div className="shrink-0">{rightSlot}</div> : null}
+      <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <h1 className="wmi-h1 max-w-3xl">{title}</h1>
+        {rightSlot ? <div className="shrink-0 self-start sm:self-auto">{rightSlot}</div> : null}
       </div>
 
-      {subtitle ? <p className="wmi-body mt-4 max-w-3xl text-sm">{subtitle}</p> : null}
+      {subtitle ? <p className="wmi-body mt-4 max-w-3xl text-[1rem] sm:text-lg">{subtitle}</p> : null}
     </div>
   );
 }
