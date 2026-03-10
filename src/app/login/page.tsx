@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 
 import { auth, db } from '@/lib/firebaseClient';
 import { doc, getDoc } from 'firebase/firestore';
-import { sendPasswordResetEmail, signInWithEmailAndPassword, User } from 'firebase/auth';
+import { signInWithEmailAndPassword, User } from 'firebase/auth';
 import PageHeader from '@/components/PageHeader';
 
 function getLoginErrorMessage(code?: string) {
@@ -100,14 +100,26 @@ export default function LoginPage() {
     setResetting(true);
 
     try {
-      await sendPasswordResetEmail(auth, email.trim());
+      const res = await fetch('/api/auth/password-reset', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        throw new Error(data.error || 'Could not send reset email right now.');
+      }
+
       setNotice('Password reset email sent. Check your inbox and spam folder.');
     } catch (err: any) {
       console.error('Password reset error:', err);
-      if (err?.code === 'auth/invalid-email') {
+      if (err?.message === 'Could not send reset email right now.') {
+        setError(err.message);
+      } else if (err?.code === 'auth/invalid-email') {
         setError('Please enter a valid email address.');
-      } else if (err?.code === 'auth/user-not-found') {
-        setError('No account found with that email.');
       } else {
         setError('Could not send reset email right now. Please try again.');
       }
