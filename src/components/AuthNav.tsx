@@ -41,12 +41,12 @@ export default function AuthNav() {
 
   // Prevent flashing wrong nav while auth state is resolving
   if (!ready) {
-    return <div className="h-10 w-44 sm:h-5 sm:w-40" />;
+    return <div className="h-8 w-48 sm:h-5 sm:w-40" />;
   }
 
   if (user) {
     return (
-      <nav className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600 sm:gap-5">
+      <nav className="flex flex-nowrap items-center justify-end gap-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600 sm:gap-5 sm:text-[11px]">
         <Link href="/dashboard" className="transition-opacity hover:opacity-70">
           Dashboard
         </Link>
@@ -63,10 +63,10 @@ export default function AuthNav() {
   }
 
   return (
-    <nav className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600 sm:gap-5">
+    <nav className="flex flex-nowrap items-center justify-end gap-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600 sm:gap-5 sm:text-[11px]">
       <Link
         href="/signup"
-        className="rounded-full border border-slate-300/80 px-3 py-2 text-center text-[10px] tracking-[0.14em] text-slate-700 transition-colors hover:bg-slate-50 sm:border-0 sm:px-0 sm:py-0 sm:text-[11px] sm:tracking-[0.08em]"
+        className="rounded-full border border-slate-300/80 px-3 py-1.5 text-center text-[10px] tracking-[0.12em] text-slate-700 transition-colors hover:bg-slate-50 sm:border-0 sm:px-0 sm:py-0 sm:text-[11px] sm:tracking-[0.08em]"
       >
         Become the One
       </Link>
