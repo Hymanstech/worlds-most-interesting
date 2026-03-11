@@ -71,7 +71,8 @@ type EditDraft = {
   isActive: boolean;
 };
 
-type GeneratedXDraft = {
+type GeneratedSocialDraft = {
+  platform: 'x' | 'instagram';
   dateKey: string;
   text: string;
   imageUrl: string;
@@ -115,7 +116,8 @@ export default function AdminPage() {
   const [failures, setFailures] = useState<AdminEvent[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
   const [generatingXPost, setGeneratingXPost] = useState(false);
-  const [generatedXDraft, setGeneratedXDraft] = useState<GeneratedXDraft | null>(null);
+  const [generatingInstagramPost, setGeneratingInstagramPost] = useState(false);
+  const [generatedDraft, setGeneratedDraft] = useState<GeneratedSocialDraft | null>(null);
   const [copyingImage, setCopyingImage] = useState(false);
 
   const [selectedUid, setSelectedUid] = useState<string | null>(null);
@@ -276,10 +278,14 @@ Assign the crown anyway without collecting a successful payment?`
     await refreshAll();
   }
 
-  async function generateXPostDraft() {
+  async function generateSocialDraft(platform: 'x' | 'instagram') {
     setError(null);
     setNotice(null);
-    setGeneratingXPost(true);
+    if (platform === 'x') {
+      setGeneratingXPost(true);
+    } else {
+      setGeneratingInstagramPost(true);
+    }
 
     try {
       const token = await getTokenOrRedirect();
@@ -291,41 +297,46 @@ Assign the crown anyway without collecting a successful payment?`
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ overwrite: true }),
+        body: JSON.stringify({ overwrite: true, platform }),
       });
 
       const data = (await res.json().catch(() => ({}))) as any;
       if (!res.ok) {
-        throw new Error(data?.error || 'Failed to generate X draft.');
+        throw new Error(data?.error || `Failed to generate ${platform} draft.`);
       }
 
-      setNotice('X draft generated for today.');
-      setGeneratedXDraft({
+      setNotice(`${platform === 'x' ? 'X' : 'Instagram'} draft generated for today.`);
+      setGeneratedDraft({
+        platform: data.platform === 'instagram' ? 'instagram' : 'x',
         dateKey: data.dateKey || '',
         text: data.text || '',
         imageUrl: data.imageUrl || '',
         activeUid: data.activeUid ?? null,
       });
     } catch (err: any) {
-      setError(err?.message || 'Failed to generate X draft.');
+      setError(err?.message || `Failed to generate ${platform} draft.`);
     } finally {
-      setGeneratingXPost(false);
+      if (platform === 'x') {
+        setGeneratingXPost(false);
+      } else {
+        setGeneratingInstagramPost(false);
+      }
     }
   }
 
-  async function copyXDraftText() {
-    if (!generatedXDraft?.text) return;
+  async function copyDraftText() {
+    if (!generatedDraft?.text) return;
 
     try {
-      await navigator.clipboard.writeText(generatedXDraft.text);
-      setNotice('X draft text copied.');
+      await navigator.clipboard.writeText(generatedDraft.text);
+      setNotice(`${generatedDraft.platform === 'x' ? 'X' : 'Instagram'} draft text copied.`);
     } catch (err: any) {
       setError(err?.message || 'Could not copy draft text.');
     }
   }
 
-  async function copyXDraftImage() {
-    if (!generatedXDraft?.imageUrl) {
+  async function copyDraftImage() {
+    if (!generatedDraft?.imageUrl) {
       setError('This draft does not have an image URL.');
       return;
     }
@@ -337,7 +348,7 @@ Assign the crown anyway without collecting a successful payment?`
 
     try {
       setCopyingImage(true);
-      const res = await fetch(generatedXDraft.imageUrl);
+      const res = await fetch(generatedDraft.imageUrl);
       if (!res.ok) {
         throw new Error('Could not load the image for copying.');
       }
@@ -515,15 +526,22 @@ Assign the crown anyway without collecting a successful payment?`
 
         <div className="flex gap-2">
           <button
-            onClick={generateXPostDraft}
+            onClick={() => generateSocialDraft('x')}
             disabled={generatingXPost}
             className="rounded-full bg-emerald-500 px-4 py-2 text-[12px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-60"
           >
             {generatingXPost ? 'Generating X Draft...' : 'Generate X Draft'}
           </button>
           <button
+            onClick={() => generateSocialDraft('instagram')}
+            disabled={generatingInstagramPost}
+            className="rounded-full bg-slate-900 px-4 py-2 text-[12px] font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
+          >
+            {generatingInstagramPost ? 'Generating Instagram Draft...' : 'Generate Instagram Draft'}
+          </button>
+          <button
             onClick={refreshAll}
-            className="rounded-full bg-slate-900 px-4 py-2 text-[12px] font-semibold text-white hover:bg-slate-800"
+            className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[12px] font-semibold text-slate-800 hover:bg-slate-50"
           >
             Refresh
           </button>
@@ -944,19 +962,21 @@ Assign the crown anyway without collecting a successful payment?`
         </div>
       </div>
 
-      {generatedXDraft ? (
+      {generatedDraft ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4">
           <div className="w-full max-w-3xl rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl sm:p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-xl font-semibold text-slate-900">Today&apos;s X Draft</h2>
+                <h2 className="text-xl font-semibold text-slate-900">
+                  Today&apos;s {generatedDraft.platform === 'x' ? 'X' : 'Instagram'} Draft
+                </h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  Date: {generatedXDraft.dateKey || '-'}
-                  {generatedXDraft.activeUid ? ` | Winner UID: ${generatedXDraft.activeUid}` : ''}
+                  Date: {generatedDraft.dateKey || '-'}
+                  {generatedDraft.activeUid ? ` | Winner UID: ${generatedDraft.activeUid}` : ''}
                 </p>
               </div>
               <button
-                onClick={() => setGeneratedXDraft(null)}
+                onClick={() => setGeneratedDraft(null)}
                 className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
               >
                 Close
@@ -970,23 +990,23 @@ Assign the crown anyway without collecting a successful payment?`
                 </label>
                 <textarea
                   readOnly
-                  value={generatedXDraft.text}
+                  value={generatedDraft.text}
                   className="mt-2 min-h-[220px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-800 outline-none"
                 />
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
-                    onClick={copyXDraftText}
+                    onClick={copyDraftText}
                     className="rounded-full bg-slate-900 px-4 py-2 text-[12px] font-semibold text-white hover:bg-slate-800"
                   >
                     Copy Text
                   </button>
                   <a
-                    href="https://x.com/compose/post"
+                    href={generatedDraft.platform === 'x' ? 'https://x.com/compose/post' : 'https://www.instagram.com/'}
                     target="_blank"
                     rel="noreferrer"
                     className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[12px] font-semibold text-slate-700 hover:bg-slate-50"
                   >
-                    Open X Composer
+                    {generatedDraft.platform === 'x' ? 'Open X Composer' : 'Open Instagram'}
                   </a>
                 </div>
               </div>
@@ -996,10 +1016,10 @@ Assign the crown anyway without collecting a successful payment?`
                   Winner Image
                 </label>
                 <div className="mt-2 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
-                  {generatedXDraft.imageUrl ? (
+                  {generatedDraft.imageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={generatedXDraft.imageUrl}
+                      src={generatedDraft.imageUrl}
                       alt="Winner draft"
                       className="h-[320px] w-full object-contain bg-white"
                     />
@@ -1011,15 +1031,15 @@ Assign the crown anyway without collecting a successful payment?`
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
-                    onClick={copyXDraftImage}
-                    disabled={!generatedXDraft.imageUrl || copyingImage}
+                    onClick={copyDraftImage}
+                    disabled={!generatedDraft.imageUrl || copyingImage}
                     className="rounded-full bg-emerald-500 px-4 py-2 text-[12px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-60"
                   >
                     {copyingImage ? 'Copying Image...' : 'Copy Image'}
                   </button>
-                  {generatedXDraft.imageUrl ? (
+                  {generatedDraft.imageUrl ? (
                     <a
-                      href={generatedXDraft.imageUrl}
+                      href={generatedDraft.imageUrl}
                       target="_blank"
                       rel="noreferrer"
                       className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[12px] font-semibold text-slate-700 hover:bg-slate-50"

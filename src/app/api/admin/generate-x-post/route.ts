@@ -58,6 +58,10 @@ function trimForX(value: string, maxLength: number) {
   return `${clean.slice(0, Math.max(0, maxLength - 1)).trimEnd()}...`;
 }
 
+function trimSentence(value: string) {
+  return value.replace(/\s+/g, ' ').trim().replace(/[.!,;:\-]+$/, '');
+}
+
 function buildDailyXPostDraft(input: {
   dateKey: string;
   championName: string;
@@ -66,9 +70,11 @@ function buildDailyXPostDraft(input: {
   xHandle: string;
 }) {
   const displayName = input.championName.trim() || "Today's champion";
-  const handlePart = input.xHandle ? ` (${input.xHandle})` : '';
-  const intro = `${displayName}${handlePart} is today's World's Most Interesting Person.`;
-  const bio = trimForX(input.championBio || 'Wearing the crown for the next 24 hours.', 120);
+  const bio = trimForX(
+    trimSentence(input.championBio || 'Wearing the crown for the next 24 hours.') + '.',
+    150
+  );
+  const intro = `${displayName} is today's World's Most Interesting Person.`;
   const cta = "See today's crown: https://www.worldsmostinteresting.com";
   const text = trimForX(`${intro} ${bio} ${cta}`, 280);
 
@@ -84,6 +90,30 @@ function buildDailyXPostDraft(input: {
   };
 }
 
+function buildInstagramDraft(input: {
+  dateKey: string;
+  championName: string;
+  championBio: string;
+  photoUrl: string;
+  instagramHandle: string;
+}) {
+  const displayName = input.championName.trim() || "Today's champion";
+  const bio = trimSentence(input.championBio || 'Wearing the crown for the next 24 hours.');
+  const handleLine = input.instagramHandle ? `\n\nInstagram: ${input.instagramHandle}` : '';
+  const caption = `${displayName} is today's World's Most Interesting Person.\n\n${bio}.${handleLine}\n\nSee today's crown: worldsmostinteresting.com`;
+
+  return {
+    platform: 'instagram',
+    status: 'draft',
+    dateKey: input.dateKey,
+    text: caption,
+    imageUrl: input.photoUrl,
+    championName: displayName,
+    championBio: bio,
+    instagramHandle: input.instagramHandle,
+  };
+}
+
 export async function POST(request: Request) {
   const gate = await requireAdmin(request);
   if (!gate.ok) {
@@ -93,13 +123,15 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as {
     dateKey?: string;
     overwrite?: boolean;
+    platform?: 'x' | 'instagram';
   };
 
   const dateKey = body.dateKey?.trim() || chicagoDateKey(new Date());
   const overwrite = body.overwrite !== false;
+  const platform = body.platform === 'instagram' ? 'instagram' : 'x';
 
   const crownRef = adminDb.collection('crownStatus').doc('current');
-  const socialRef = adminDb.collection('social_posts').doc(`x-${dateKey}`);
+  const socialRef = adminDb.collection('social_posts').doc(`${platform}-${dateKey}`);
 
   const [crownSnap, existingDraftSnap] = await Promise.all([crownRef.get(), socialRef.get()]);
 
@@ -140,18 +172,28 @@ export async function POST(request: Request) {
     pickString(crown, ['currentChampionPhotoUrl']) ||
     pickString(user, ['photoUrl', 'photoURL', 'profilePhotoUrl', 'profilePhotoURL']);
   const xHandle = pickString(user, ['xHandle']);
+  const instagramHandle = pickString(user, ['instagramHandle']);
 
   if (!championName) {
     return NextResponse.json({ error: 'Could not determine champion name.' }, { status: 400 });
   }
 
-  const draft = buildDailyXPostDraft({
-    dateKey,
-    championName,
-    championBio,
-    photoUrl,
-    xHandle,
-  });
+  const draft =
+    platform === 'instagram'
+      ? buildInstagramDraft({
+          dateKey,
+          championName,
+          championBio,
+          photoUrl,
+          instagramHandle,
+        })
+      : buildDailyXPostDraft({
+          dateKey,
+          championName,
+          championBio,
+          photoUrl,
+          xHandle,
+        });
 
   await socialRef.set(
     {
@@ -170,7 +212,9 @@ export async function POST(request: Request) {
 
   await crownRef.set(
     {
-      lastXDraftForDate: dateKey,
+      ...(platform === 'instagram'
+        ? { lastInstagramDraftForDate: dateKey }
+        : { lastXDraftForDate: dateKey }),
       updatedAt: adminFieldValue.serverTimestamp(),
     },
     { merge: true }
@@ -178,6 +222,7 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     ok: true,
+    platform,
     dateKey,
     activeUid: activeUid || null,
     text: draft.text,

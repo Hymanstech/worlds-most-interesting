@@ -98,12 +98,39 @@ function buildDailyXPostDraft({
   photoUrl: string;
   xHandle: string;
 }) {
-  const displayName = championName.trim() || "Today's champion";
-  const handlePart = xHandle ? ` (${xHandle})` : "";
-  const intro = `${displayName}${handlePart} is today's World's Most Interesting Person.`;
-  const bio = trimForX(championBio || "Wearing the crown for the next 24 hours.", 120);
-  const cta = "See today's crown: https://www.worldsmostinteresting.com";
+  return buildDailyXPostDraftClean({
+    dateKey,
+    championName,
+    championBio,
+    photoUrl,
+    xHandle,
+  });
+}
 
+function trimSentenceClean(value: string) {
+  return value.replace(/\s+/g, " ").trim().replace(/[.!,;:\-]+$/, "");
+}
+
+function buildDailyXPostDraftClean({
+  dateKey,
+  championName,
+  championBio,
+  photoUrl,
+  xHandle,
+}: {
+  dateKey: string;
+  championName: string;
+  championBio: string;
+  photoUrl: string;
+  xHandle: string;
+}) {
+  const displayName = championName.trim() || "Today's champion";
+  const bio = trimForX(
+    `${trimSentenceClean(championBio || "Wearing the crown for the next 24 hours.")}.`,
+    150
+  );
+  const intro = `${displayName} is today's World's Most Interesting Person.`;
+  const cta = "See today's crown: https://www.worldsmostinteresting.com";
   const text = trimForX(`${intro} ${bio} ${cta}`, 280);
 
   return {
