@@ -71,6 +71,13 @@ type EditDraft = {
   isActive: boolean;
 };
 
+type GeneratedXDraft = {
+  dateKey: string;
+  text: string;
+  imageUrl: string;
+  activeUid?: string | null;
+};
+
 function formatMoney(amountCents?: number | null) {
   if (typeof amountCents !== 'number' || !Number.isFinite(amountCents)) return '-';
   return `$${(amountCents / 100).toFixed(2)}`;
@@ -108,6 +115,8 @@ export default function AdminPage() {
   const [failures, setFailures] = useState<AdminEvent[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
   const [generatingXPost, setGeneratingXPost] = useState(false);
+  const [generatedXDraft, setGeneratedXDraft] = useState<GeneratedXDraft | null>(null);
+  const [copyingImage, setCopyingImage] = useState(false);
 
   const [selectedUid, setSelectedUid] = useState<string | null>(null);
   const [draft, setDraft] = useState<EditDraft | null>(null);
@@ -291,10 +300,60 @@ Assign the crown anyway without collecting a successful payment?`
       }
 
       setNotice('X draft generated for today.');
+      setGeneratedXDraft({
+        dateKey: data.dateKey || '',
+        text: data.text || '',
+        imageUrl: data.imageUrl || '',
+        activeUid: data.activeUid ?? null,
+      });
     } catch (err: any) {
       setError(err?.message || 'Failed to generate X draft.');
     } finally {
       setGeneratingXPost(false);
+    }
+  }
+
+  async function copyXDraftText() {
+    if (!generatedXDraft?.text) return;
+
+    try {
+      await navigator.clipboard.writeText(generatedXDraft.text);
+      setNotice('X draft text copied.');
+    } catch (err: any) {
+      setError(err?.message || 'Could not copy draft text.');
+    }
+  }
+
+  async function copyXDraftImage() {
+    if (!generatedXDraft?.imageUrl) {
+      setError('This draft does not have an image URL.');
+      return;
+    }
+
+    if (typeof ClipboardItem === 'undefined' || !navigator.clipboard?.write) {
+      setError('Image copy is not supported in this browser. Use Open Image instead.');
+      return;
+    }
+
+    try {
+      setCopyingImage(true);
+      const res = await fetch(generatedXDraft.imageUrl);
+      if (!res.ok) {
+        throw new Error('Could not load the image for copying.');
+      }
+
+      const blob = await res.blob();
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          [blob.type || 'image/png']: blob,
+        }),
+      ]);
+
+      setNotice('Draft image copied to clipboard.');
+    } catch (err: any) {
+      setError(err?.message || 'Could not copy the image. Try Open Image instead.');
+    } finally {
+      setCopyingImage(false);
     }
   }
 
@@ -884,6 +943,96 @@ Assign the crown anyway without collecting a successful payment?`
           </div>
         </div>
       </div>
+
+      {generatedXDraft ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4">
+          <div className="w-full max-w-3xl rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl sm:p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold text-slate-900">Today&apos;s X Draft</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Date: {generatedXDraft.dateKey || '-'}
+                  {generatedXDraft.activeUid ? ` | Winner UID: ${generatedXDraft.activeUid}` : ''}
+                </p>
+              </div>
+              <button
+                onClick={() => setGeneratedXDraft(null)}
+                className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="mt-5 grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Post Text
+                </label>
+                <textarea
+                  readOnly
+                  value={generatedXDraft.text}
+                  className="mt-2 min-h-[220px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-800 outline-none"
+                />
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    onClick={copyXDraftText}
+                    className="rounded-full bg-slate-900 px-4 py-2 text-[12px] font-semibold text-white hover:bg-slate-800"
+                  >
+                    Copy Text
+                  </button>
+                  <a
+                    href="https://x.com/compose/post"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[12px] font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    Open X Composer
+                  </a>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Winner Image
+                </label>
+                <div className="mt-2 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                  {generatedXDraft.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={generatedXDraft.imageUrl}
+                      alt="Winner draft"
+                      className="h-[320px] w-full object-contain bg-white"
+                    />
+                  ) : (
+                    <div className="flex h-[320px] items-center justify-center px-6 text-center text-sm text-slate-500">
+                      No image URL was available for this draft.
+                    </div>
+                  )}
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    onClick={copyXDraftImage}
+                    disabled={!generatedXDraft.imageUrl || copyingImage}
+                    className="rounded-full bg-emerald-500 px-4 py-2 text-[12px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-60"
+                  >
+                    {copyingImage ? 'Copying Image...' : 'Copy Image'}
+                  </button>
+                  {generatedXDraft.imageUrl ? (
+                    <a
+                      href={generatedXDraft.imageUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[12px] font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      Open Image
+                    </a>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
