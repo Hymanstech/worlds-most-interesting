@@ -48,10 +48,11 @@ export default function LoginPage() {
       !!data.photoUrl;
 
     const hasPayment = !!data.defaultPaymentMethodId;
+    const needsPayment = typeof data.crownPrice === 'number' && data.crownPrice > 0;
 
     if (!hasProfile) {
       router.push('/setup/profile');
-    } else if (!hasPayment) {
+    } else if (needsPayment && !hasPayment) {
       router.push('/setup/payment');
     } else {
       router.push('/dashboard');

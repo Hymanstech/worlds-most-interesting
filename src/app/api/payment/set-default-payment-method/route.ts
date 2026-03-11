@@ -46,6 +46,10 @@ export async function POST(req: Request) {
     const user = (snap.data() || {}) as any;
     const stripeCustomerId =
       typeof user.stripeCustomerId === "string" ? user.stripeCustomerId : undefined;
+    const crownPrice =
+      typeof user.crownPrice === "number" && Number.isFinite(user.crownPrice)
+        ? user.crownPrice
+        : 0;
 
     const stripe = getStripe();
 
@@ -64,7 +68,7 @@ export async function POST(req: Request) {
     // Mark active + store PM metadata server-side
     await userRef.set(
       {
-        isActive: true, // <-- use whatever your app expects (active vs isActive)
+        isActive: crownPrice > 0,
         stripeDefaultPaymentMethodId: paymentMethodId, // keep in sync with charging code
         defaultPaymentMethodId: paymentMethodId, // optional compatibility
         cardBrand: brand,

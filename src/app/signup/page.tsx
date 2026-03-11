@@ -51,10 +51,11 @@ export default function SignupPage() {
       !!data.photoUrl;
 
     const hasPayment = !!data.defaultPaymentMethodId;
+    const needsPayment = typeof data.crownPrice === 'number' && data.crownPrice > 0;
 
     if (!hasProfile) {
       router.push('/setup/profile');
-    } else if (!hasPayment) {
+    } else if (needsPayment && !hasPayment) {
       router.push('/setup/payment');
     } else {
       router.push('/dashboard');
@@ -197,7 +198,7 @@ export default function SignupPage() {
       <PageHeader
         kicker="Account"
         title="Create your account"
-        subtitle="Start by creating an account. You will set your Crown Price and card in the next steps."
+        subtitle="Start by creating an account. You can set your Crown Price next and only need a card once you bid above $0."
       />
 
       <form

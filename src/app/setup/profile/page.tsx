@@ -110,12 +110,13 @@ export default function ProfileSetupPage() {
         crownPrice: crownPriceNumber,
         bio: bio.trim(),
         photoUrl,
+        isActive: false,
         instagramHandle: normalizeSocialHandle(instagramHandle),
         xHandle: normalizeSocialHandle(xHandle),
         updatedAt: serverTimestamp(),
       });
 
-      router.push('/setup/payment');
+      router.push(crownPriceNumber > 0 ? '/setup/payment' : '/dashboard');
     } catch (err: any) {
       console.error('Error saving profile:', err);
       setError(err?.message || 'Something went wrong saving your profile.');
@@ -129,7 +130,7 @@ export default function ProfileSetupPage() {
       <PageHeader
         kicker="Setup"
         title="Set up your crown profile"
-        subtitle="Choose a daily Crown Price, upload your photo, and write a short bio."
+        subtitle="Choose a daily Crown Price, upload your photo, and write a short bio. Set $0 if you just want a profile for now."
       />
 
       <form
@@ -239,7 +240,7 @@ export default function ProfileSetupPage() {
           disabled={loading}
           className="w-full rounded-full bg-emerald-500 px-5 py-2.5 text-[11px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-60 sm:w-auto sm:py-2"
         >
-          {loading ? 'Saving profile' : 'Continue to Authorization'}
+          {loading ? 'Saving profile' : 'Continue'}
         </button>
       </form>
     </div>

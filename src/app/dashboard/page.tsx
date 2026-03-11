@@ -179,12 +179,14 @@ export default function DashboardPage() {
     }
 
     const prevPrice = userProfile?.crownPrice ?? 0;
+    const hasPayment = Boolean(userProfile?.stripeCustomerId && userProfile?.defaultPaymentMethodId);
 
     setUpdatingPrice(true);
 
     try {
       const patch: any = {
         crownPrice: parsed,
+        isActive: parsed > 0 && hasPayment,
         updatedAt: serverTimestamp(),
       };
 
@@ -208,6 +210,11 @@ export default function DashboardPage() {
 
       //  Sync queueEntries (server writes)
       await syncQueueEntryForCurrentUser();
+
+      if (parsed > 0 && !hasPayment) {
+        router.push('/setup/payment');
+        return;
+      }
 
     } catch (err: any) {
       console.error('Error updating crown price:', err);
@@ -420,15 +427,21 @@ export default function DashboardPage() {
         <div className="text-xs text-slate-700 space-y-1">
           <p>
             <strong>Account status:</strong>{' '}
-            {userProfile?.isActive && hasPayment ? (
+            {yourPrice === 0 ? (
+              <span className="font-semibold text-slate-700">Profile only</span>
+            ) : userProfile?.isActive && hasPayment ? (
               <span className="font-semibold text-emerald-600">Active</span>
             ) : (
-              <span className="font-semibold text-amber-600">Inactive</span>
+              <span className="font-semibold text-amber-600">Needs card</span>
             )}
           </p>
           {hasPayment ? (
             <p className="text-[10px] text-slate-500">
               We don&apos;t store your full card details. Stripe securely manages your payment method.
+            </p>
+          ) : yourPrice === 0 ? (
+            <p className="text-[10px] text-slate-500">
+              You can keep a profile at $0 and add a card later when you&apos;re ready to compete for the crown.
             </p>
           ) : (
             <p className="text-[10px] text-slate-500">
