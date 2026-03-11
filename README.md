@@ -1,36 +1,77 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## World's Most Interesting
 
-## Getting Started
+Paid daily crown game built with Next.js, Firebase, and Stripe. Users create a profile, set a daily Crown Price, authorize a payment method, and compete to be featured on the homepage. Admin tooling supports moderation and manual crown assignment, and a cron route settles the nightly winner.
 
-First, run the development server:
+## Stack
+
+- Next.js App Router
+- Firebase Auth, Firestore, and Storage
+- Firebase Admin SDK for server routes
+- Stripe SetupIntents and off-session PaymentIntents
+- Optional Postmark password reset email delivery
+
+## Local Development
+
+Install dependencies and run the app:
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Production verification:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run build
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Required Environment Variables
 
-## Learn More
+Client:
 
-To learn more about Next.js, take a look at the following resources:
+- `NEXT_PUBLIC_FIREBASE_API_KEY`
+- `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
+- `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+- `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
+- `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
+- `NEXT_PUBLIC_FIREBASE_APP_ID`
+- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
+- `NEXT_PUBLIC_APP_URL` or `NEXT_PUBLIC_SITE_URL`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Server:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `STRIPE_SECRET_KEY`
+- `FIREBASE_ADMIN_JSON` or equivalent Google application default credentials
+- `ADMIN_UIDS`
+- `CRON_SECRET`
+- `APP_URL` for password reset links
+- `POSTMARK_SERVER_TOKEN` if password reset email delivery is enabled
 
-## Deploy on Vercel
+## Core Flows
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- `/signup`: creates or resumes an account, stores legal acceptance, then routes to profile setup.
+- `/setup/profile`: sets bio, photo, and Crown Price.
+- `/setup/payment`: creates a Stripe SetupIntent and stores the default payment method.
+- `/dashboard`: lets users update price, manage card state, and view queue position.
+- `/admin`: admin-only operations page for user edits, crown status review, and manual assignment.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Operations
+
+- Nightly settlement runs through `POST /api/cron/settle-crown` with header `x-cron-secret: <CRON_SECRET>`.
+- Settlement charges the top eligible active user, updates `crownStatus/current`, and records the active winner snapshot.
+- Admin access is controlled by Firebase custom claim `admin: true` or by `ADMIN_UIDS`.
+- Payment routes are expected to be called with a Firebase ID token in the `Authorization: Bearer <token>` header.
+
+## Launch Checklist
+
+- Configure all environment variables in the deployment target.
+- Confirm Firebase Auth, Firestore, and Storage rules are correct for production.
+- Ensure the nightly cron job is configured and sending `x-cron-secret`.
+- Seed at least one admin UID.
+- Run a production build before deploy.
+- Exercise signup, profile setup, payment setup, dashboard update, admin assign, and nightly settlement in a staging environment.
+
+## Current Gaps
+
+- There is not yet an automated test suite for the payment and crown-settlement flows.
+- Linting may require a shell environment where `npm` is available on PATH.

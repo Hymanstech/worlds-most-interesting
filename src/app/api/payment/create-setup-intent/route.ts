@@ -1,34 +1,33 @@
 // src/app/api/payment/create-setup-intent/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getStripe } from '@/lib/stripe';
-
-import { initializeApp, getApps } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { adminAuth, adminDb, adminFieldValue } from '@/lib/firebaseAdmin';
 
 // Ensure Node runtime for Stripe + firebase-admin
 export const runtime = 'nodejs';
 
-// Initialize firebase-admin once
-if (!getApps().length) {
-  initializeApp();
+function getBearerToken(req: Request) {
+  const authHeader = req.headers.get('authorization') || '';
+  const match = authHeader.match(/^Bearer (.+)$/i);
+  return match?.[1] ?? null;
 }
-const adminDb = getFirestore();
 
 export async function POST(req: NextRequest) {
   try {
     const stripe = getStripe();
+    const token = getBearerToken(req);
+
+    if (!token) {
+      return NextResponse.json({ error: 'Missing Authorization token' }, { status: 401 });
+    }
+
+    const decoded = await adminAuth.verifyIdToken(token);
+    const uid = decoded.uid;
 
     const body = (await req.json().catch(() => ({}))) as {
-      uid?: string;
       email?: string;
     };
-
-    const uid = body.uid?.trim();
-    const email = body.email?.trim();
-
-    if (!uid) {
-      return NextResponse.json({ error: 'Missing uid' }, { status: 400 });
-    }
+    const email = decoded.email?.trim() || body.email?.trim();
 
     // 1) Load user doc so we can reuse stripeCustomerId
     const userRef = adminDb.collection('users').doc(uid);
@@ -53,7 +52,7 @@ export async function POST(req: NextRequest) {
       await userRef.set(
         {
           stripeCustomerId,
-          updatedAt: new Date(),
+          updatedAt: adminFieldValue.serverTimestamp(),
         },
         { merge: true }
       );

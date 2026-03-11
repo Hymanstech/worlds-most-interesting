@@ -2,9 +2,7 @@ export const runtime = 'nodejs';
 
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import admin from 'firebase-admin';
-import { adminDb } from '@/lib/firebaseAdmin'; // <-- adjust if your export path differs
-
+import { adminAuth, adminDb, adminFieldValue } from '@/lib/firebaseAdmin';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-11-17.clover" as any,
@@ -23,7 +21,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing Authorization token' }, { status: 401 });
     }
 
-    const decoded = await admin.auth().verifyIdToken(token);
+    const decoded = await adminAuth.verifyIdToken(token);
     const uid = decoded.uid;
 
     const userRef = adminDb.collection('users').doc(uid);
@@ -37,31 +35,33 @@ export async function POST(req: Request) {
     const stripeCustomerId = user.stripeCustomerId as string | undefined;
     const defaultPaymentMethodId = user.defaultPaymentMethodId as string | undefined;
 
-// Best-effort: clear default PM on Stripe customer
-if (stripeCustomerId) {
-  await stripe.customers
-    .update(stripeCustomerId, {
-      invoice_settings: {
-        default_payment_method: undefined,
-      },
-    })
-    .catch(() => {});
-}
-
+    // Best-effort: clear default PM on Stripe customer
+    if (stripeCustomerId) {
+      await stripe.customers
+        .update(stripeCustomerId, {
+          invoice_settings: {
+            default_payment_method: undefined,
+          },
+        })
+        .catch(() => {});
+    }
 
     // Best-effort: detach PM
     if (defaultPaymentMethodId) {
       await stripe.paymentMethods.detach(defaultPaymentMethodId).catch(() => {});
     }
 
-    // Server-side Firestore update (Admin bypasses rules)
+    // Server-side Firestore update must match the fields the app actually reads.
     await userRef.set(
       {
+        isActive: false,
         active: false,
+        crownPrice: 0,
         defaultPaymentMethodId: null,
+        stripeDefaultPaymentMethodId: null,
         cardBrand: null,
         cardLast4: null,
-        updatedAt: new Date(),
+        updatedAt: adminFieldValue.serverTimestamp(),
       },
       { merge: true }
     );

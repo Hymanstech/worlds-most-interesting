@@ -1,12 +1,26 @@
 // src/app/api/payment/attach-method/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getStripe } from '@/lib/stripe';
+import { adminAuth, adminDb } from '@/lib/firebaseAdmin';
 
 // Ensure Node runtime for Stripe SDK
 export const runtime = 'nodejs';
 
+function getBearerToken(req: Request) {
+  const authHeader = req.headers.get('authorization') || '';
+  const match = authHeader.match(/^Bearer (.+)$/i);
+  return match?.[1] ?? null;
+}
+
 export async function POST(req: NextRequest) {
   try {
+    const token = getBearerToken(req);
+    if (!token) {
+      return NextResponse.json({ error: 'Missing Authorization token' }, { status: 401 });
+    }
+
+    const decoded = await adminAuth.verifyIdToken(token);
+    const uid = decoded.uid;
     const stripe = getStripe();
 
     const body = (await req.json().catch(() => ({}))) as {
@@ -21,6 +35,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: 'Missing customerId or paymentMethodId' },
         { status: 400 }
+      );
+    }
+
+    const userSnap = await adminDb.collection('users').doc(uid).get();
+    if (!userSnap.exists) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    const user = userSnap.data() || {};
+    const stripeCustomerId =
+      typeof user.stripeCustomerId === 'string' ? user.stripeCustomerId : undefined;
+
+    if (!stripeCustomerId || stripeCustomerId !== customerId) {
+      return NextResponse.json(
+        { error: 'Customer does not belong to the authenticated user.' },
+        { status: 403 }
       );
     }
 
