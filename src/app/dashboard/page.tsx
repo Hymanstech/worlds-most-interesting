@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { auth, db } from '@/lib/firebaseClient';
@@ -53,6 +53,7 @@ async function syncQueueEntryForCurrentUser() {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const paymentSectionRef = useRef<HTMLElement | null>(null);
 
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -63,13 +64,35 @@ export default function DashboardPage() {
   const [removingCard, setRemovingCard] = useState(false);
 
   const [highestActiveCrownPrice, setHighestActiveCrownPrice] = useState<number>(0);
+  const [showCardRequiredModal, setShowCardRequiredModal] = useState(false);
 
   // Queue / tier info
   const [tierPosition, setTierPosition] = useState<number | null>(null);
   const [tierSize, setTierSize] = useState<number | null>(null);
 
+  async function refreshHighestBid() {
+    try {
+      const res = await fetch('/api/public/top-bid', { cache: 'no-store' });
+      const data = (await res.json().catch(() => ({}))) as { highestBid?: number };
+
+      if (!res.ok) {
+        throw new Error('Failed to load highest bid.');
+      }
+
+      setHighestActiveCrownPrice(
+        typeof data.highestBid === 'number' && Number.isFinite(data.highestBid)
+          ? data.highestBid
+          : 0
+      );
+    } catch (err) {
+      console.error('Error loading highest bid:', err);
+      setHighestActiveCrownPrice(0);
+    }
+  }
+
   useEffect(() => {
     let unsubscribeQueue: (() => void) | null = null;
+    let refreshTimer: ReturnType<typeof setInterval> | null = null;
 
     async function loadData() {
       try {
@@ -99,6 +122,7 @@ export default function DashboardPage() {
 
         // Make sure this user has a queueEntry doc before subscribing.
         await syncQueueEntryForCurrentUser();
+        await refreshHighestBid();
 
         const activeQueue = query(
           collection(db, 'queueEntries'),
@@ -112,12 +136,6 @@ export default function DashboardPage() {
               id: d.id,
               ...(d.data() as any),
             }));
-
-            const highestBid = activeEntries.reduce((max, entry) => {
-              const price = typeof entry.crownPrice === 'number' ? entry.crownPrice : 0;
-              return price > max ? price : max;
-            }, 0);
-            setHighestActiveCrownPrice(highestBid);
 
             const currentUserEntry = activeEntries.find((entry) => entry.id === user.uid);
             const currentUserPrice =
@@ -147,6 +165,10 @@ export default function DashboardPage() {
           }
         );
 
+        refreshTimer = setInterval(() => {
+          refreshHighestBid().catch(() => {});
+        }, 15000);
+
         setLoading(false);
       } catch (err: any) {
         console.error('Error loading dashboard:', err);
@@ -159,6 +181,7 @@ export default function DashboardPage() {
 
     return () => {
       if (unsubscribeQueue) unsubscribeQueue();
+      if (refreshTimer) clearInterval(refreshTimer);
     };
   }, [router]);
 
@@ -180,6 +203,11 @@ export default function DashboardPage() {
 
     const prevPrice = userProfile?.crownPrice ?? 0;
     const hasPayment = Boolean(userProfile?.stripeCustomerId && userProfile?.defaultPaymentMethodId);
+
+    if (parsed > 0 && !hasPayment) {
+      setShowCardRequiredModal(true);
+      return;
+    }
 
     setUpdatingPrice(true);
 
@@ -210,11 +238,7 @@ export default function DashboardPage() {
 
       //  Sync queueEntries (server writes)
       await syncQueueEntryForCurrentUser();
-
-      if (parsed > 0 && !hasPayment) {
-        router.push('/setup/payment');
-        return;
-      }
+      await refreshHighestBid();
 
     } catch (err: any) {
       console.error('Error updating crown price:', err);
@@ -254,6 +278,7 @@ export default function DashboardPage() {
 
       // Sync queueEntries after deactivation
       await syncQueueEntryForCurrentUser();
+      await refreshHighestBid();
 
       // Update local UI state immediately
       setUserProfile((prev) =>
@@ -407,7 +432,7 @@ export default function DashboardPage() {
       </section>
 
       {/* Payment / Status */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-3">
+      <section ref={paymentSectionRef} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-3">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-sm font-semibold text-slate-900">Payment Method & Account Status</h2>
@@ -463,6 +488,38 @@ export default function DashboardPage() {
 
         {error && userProfile && <p className="mt-2 text-[11px] text-red-500">{error}</p>}
       </section>
+
+      {showCardRequiredModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4">
+          <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <h2 className="text-xl font-semibold text-slate-900">Card required for paid bids</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              Please enter card information below before submitting a Crown Price above $0.
+              Your card is only charged if you win the crown for the day.
+            </p>
+
+            <div className="mt-5 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCardRequiredModal(false);
+                  paymentSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+                className="rounded-full bg-emerald-500 px-4 py-2 text-[12px] font-semibold text-white hover:bg-emerald-400"
+              >
+                Add Card Below
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowCardRequiredModal(false)}
+                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[12px] font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
