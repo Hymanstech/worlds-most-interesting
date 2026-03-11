@@ -107,6 +107,7 @@ export default function AdminPage() {
   const [winners, setWinners] = useState<AdminEvent[]>([]);
   const [failures, setFailures] = useState<AdminEvent[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
+  const [generatingXPost, setGeneratingXPost] = useState(false);
 
   const [selectedUid, setSelectedUid] = useState<string | null>(null);
   const [draft, setDraft] = useState<EditDraft | null>(null);
@@ -266,6 +267,37 @@ Assign the crown anyway without collecting a successful payment?`
     await refreshAll();
   }
 
+  async function generateXPostDraft() {
+    setError(null);
+    setNotice(null);
+    setGeneratingXPost(true);
+
+    try {
+      const token = await getTokenOrRedirect();
+      if (!token) return;
+
+      const res = await fetch('/api/admin/generate-x-post', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ overwrite: true }),
+      });
+
+      const data = (await res.json().catch(() => ({}))) as any;
+      if (!res.ok) {
+        throw new Error(data?.error || 'Failed to generate X draft.');
+      }
+
+      setNotice('X draft generated for today.');
+    } catch (err: any) {
+      setError(err?.message || 'Failed to generate X draft.');
+    } finally {
+      setGeneratingXPost(false);
+    }
+  }
+
   function beginEdit(user: AdminUserRow) {
     setSelectedUid(user.uid);
     setDraft({
@@ -423,6 +455,13 @@ Assign the crown anyway without collecting a successful payment?`
         </div>
 
         <div className="flex gap-2">
+          <button
+            onClick={generateXPostDraft}
+            disabled={generatingXPost}
+            className="rounded-full bg-emerald-500 px-4 py-2 text-[12px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-60"
+          >
+            {generatingXPost ? 'Generating X Draft...' : 'Generate X Draft'}
+          </button>
           <button
             onClick={refreshAll}
             className="rounded-full bg-slate-900 px-4 py-2 text-[12px] font-semibold text-white hover:bg-slate-800"

@@ -79,6 +79,45 @@ function buildPublicChampionSnapshot(u: any) {
   };
 }
 
+function trimForX(value: string, maxLength: number) {
+  const clean = value.replace(/\s+/g, " ").trim();
+  if (clean.length <= maxLength) return clean;
+  return `${clean.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
+}
+
+function buildDailyXPostDraft({
+  dateKey,
+  championName,
+  championBio,
+  photoUrl,
+  xHandle,
+}: {
+  dateKey: string;
+  championName: string;
+  championBio: string;
+  photoUrl: string;
+  xHandle: string;
+}) {
+  const displayName = championName.trim() || "Today's champion";
+  const handlePart = xHandle ? ` (${xHandle})` : "";
+  const intro = `${displayName}${handlePart} is today's World's Most Interesting Person.`;
+  const bio = trimForX(championBio || "Wearing the crown for the next 24 hours.", 120);
+  const cta = "See today's crown: https://www.worldsmostinteresting.com";
+
+  const text = trimForX(`${intro} ${bio} ${cta}`, 280);
+
+  return {
+    platform: "x",
+    status: "draft",
+    dateKey,
+    text,
+    imageUrl: photoUrl,
+    championName: displayName,
+    championBio: bio,
+    xHandle,
+  };
+}
+
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
@@ -626,5 +665,115 @@ export const settleCrownNightly = onSchedule(
       console.error("settleCrownNightly error:", err?.message || err);
       throw err;
     }
+  }
+);
+
+async function createOrUpdateDailyXPostDraft({
+  dateKey,
+  overwrite,
+}: {
+  dateKey: string;
+  overwrite: boolean;
+}) {
+  const db = admin.firestore();
+  const crownRef = db.collection("crownStatus").doc("current");
+  const socialRef = db.collection("social_posts").doc(`x-${dateKey}`);
+
+  const [crownSnap, existingDraftSnap] = await Promise.all([crownRef.get(), socialRef.get()]);
+
+  if (!crownSnap.exists) {
+    console.log("createOrUpdateDailyXPostDraft skipped (missing crownStatus/current)", { dateKey });
+    return { ok: false, reason: "missing_crown_status" as const };
+  }
+
+  if (existingDraftSnap.exists && !overwrite) {
+    console.log("createOrUpdateDailyXPostDraft skipped (already exists)", { dateKey });
+    return { ok: true, skipped: true as const, reason: "already_exists" as const };
+  }
+
+  const crown = crownSnap.data() as Record<string, any>;
+  const activeUid =
+    (typeof crown.activeUid === "string" && crown.activeUid) ||
+    (typeof crown.currentChampionUid === "string" && crown.currentChampionUid) ||
+    "";
+
+  const snapshotName = pickString(crown, ["currentChampionName"]);
+  const snapshotBio = pickString(crown, ["currentChampionBio"]);
+  const snapshotPhotoUrl = pickString(crown, ["currentChampionPhotoUrl"]);
+
+  let user: Record<string, any> = {};
+  if (activeUid) {
+    const userSnap = await db.collection("users").doc(activeUid).get();
+    if (userSnap.exists) {
+      user = userSnap.data() as Record<string, any>;
+    }
+  }
+
+  const championName = snapshotName || pickString(user, ["fullName", "displayName", "name"]);
+  const championBio = snapshotBio || pickString(user, ["bio"]);
+  const photoUrl =
+    snapshotPhotoUrl || pickString(user, ["photoUrl", "photoURL", "profilePhotoUrl", "profilePhotoURL"]);
+  const xHandle = pickString(user, ["xHandle"]);
+
+  if (!championName) {
+    console.log("createOrUpdateDailyXPostDraft skipped (missing champion name)", { dateKey, activeUid });
+    return { ok: false, reason: "missing_champion_name" as const, activeUid };
+  }
+
+  const draft = buildDailyXPostDraft({
+    dateKey,
+    championName,
+    championBio,
+    photoUrl,
+    xHandle,
+  });
+
+  await socialRef.set(
+    {
+      ...draft,
+      activeUid: activeUid || null,
+      source: "crownStatus/current",
+      createdAt: existingDraftSnap.exists
+        ? existingDraftSnap.get("createdAt") || admin.firestore.FieldValue.serverTimestamp()
+        : admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastGeneratedAt: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+
+  await crownRef.set(
+    {
+      lastXDraftForDate: dateKey,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+
+  console.log("createOrUpdateDailyXPostDraft wrote draft", {
+    dateKey,
+    activeUid,
+    overwrite,
+    hasImageUrl: Boolean(photoUrl),
+    textLength: draft.text.length,
+  });
+
+  return {
+    ok: true,
+    skipped: false as const,
+    activeUid,
+    hasImageUrl: Boolean(photoUrl),
+    textLength: draft.text.length,
+  };
+}
+
+export const prepareDailyXPostDraft = onSchedule(
+  {
+    schedule: "35 0 * * *",
+    timeZone: "America/Chicago",
+  },
+  async () => {
+    const dateKey = chicagoDateKey(new Date());
+    await createOrUpdateDailyXPostDraft({ dateKey, overwrite: false });
   }
 );

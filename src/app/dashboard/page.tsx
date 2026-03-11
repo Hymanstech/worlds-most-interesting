@@ -8,7 +8,7 @@ import {
   collection,
   doc,
   getDoc,
-  getDocs,
+  onSnapshot,
   query,
   updateDoc,
   where,
@@ -62,13 +62,15 @@ export default function DashboardPage() {
   const [updatingPrice, setUpdatingPrice] = useState(false);
   const [removingCard, setRemovingCard] = useState(false);
 
-  const [currentHighestCrownPrice, setCurrentHighestCrownPrice] = useState<number | null>(null);
+  const [highestActiveCrownPrice, setHighestActiveCrownPrice] = useState<number>(0);
 
   // Queue / tier info
   const [tierPosition, setTierPosition] = useState<number | null>(null);
   const [tierSize, setTierSize] = useState<number | null>(null);
 
   useEffect(() => {
+    let unsubscribeQueue: (() => void) | null = null;
+
     async function loadData() {
       try {
         setError(null);
@@ -95,51 +97,55 @@ export default function DashboardPage() {
 
         setPriceInput(typeof data.crownPrice === 'number' ? String(data.crownPrice) : '0');
 
-        // 2) Load crownStatus/current
-        const statusRef = doc(db, 'crownStatus', 'current');
-        const statusSnap = await getDoc(statusRef);
-        if (statusSnap.exists()) {
-          const statusData = statusSnap.data() as { currentHighestCrownPrice?: number };
-          setCurrentHighestCrownPrice(
-            typeof statusData.currentHighestCrownPrice === 'number'
-              ? statusData.currentHighestCrownPrice
-              : null
-          );
-        } else {
-          setCurrentHighestCrownPrice(null);
-        }
-
-        //  Make sure this user has a queueEntry doc (safe)
+        // Make sure this user has a queueEntry doc before subscribing.
         await syncQueueEntryForCurrentUser();
 
-        // 3) Queue position within your price tier (PUBLIC queueEntries)
-        if (typeof data.crownPrice === 'number' && data.crownPrice > 0) {
-          const qTier = query(
-            collection(db, 'queueEntries'),
-            where('isActive', '==', true),
-            where('crownPrice', '==', data.crownPrice)
-          );
+        const activeQueue = query(
+          collection(db, 'queueEntries'),
+          where('isActive', '==', true)
+        );
 
-          const tierSnap = await getDocs(qTier);
-          const tier: QueueEntry[] = tierSnap.docs.map((d) => ({
-            id: d.id,
-            ...(d.data() as any),
-          }));
+        unsubscribeQueue = onSnapshot(
+          activeQueue,
+          (queueSnap) => {
+            const activeEntries: QueueEntry[] = queueSnap.docs.map((d) => ({
+              id: d.id,
+              ...(d.data() as any),
+            }));
 
-          // Sort FIFO by priceJoinedAt ascending
-          tier.sort((a, b) => {
-            const ta = a.priceJoinedAt?.toMillis?.() ?? 0;
-            const tb = b.priceJoinedAt?.toMillis?.() ?? 0;
-            return ta - tb;
-          });
+            const highestBid = activeEntries.reduce((max, entry) => {
+              const price = typeof entry.crownPrice === 'number' ? entry.crownPrice : 0;
+              return price > max ? price : max;
+            }, 0);
+            setHighestActiveCrownPrice(highestBid);
 
-          const idx = tier.findIndex((u) => u.id === user.uid);
-          setTierPosition(idx >= 0 ? idx + 1 : null);
-          setTierSize(tier.length);
-        } else {
-          setTierPosition(null);
-          setTierSize(null);
-        }
+            const currentUserEntry = activeEntries.find((entry) => entry.id === user.uid);
+            const currentUserPrice =
+              typeof currentUserEntry?.crownPrice === 'number'
+                ? currentUserEntry.crownPrice
+                : 0;
+
+            if (currentUserPrice > 0) {
+              const tier = activeEntries
+                .filter((entry) => entry.crownPrice === currentUserPrice)
+                .sort((a, b) => {
+                  const ta = a.priceJoinedAt?.toMillis?.() ?? 0;
+                  const tb = b.priceJoinedAt?.toMillis?.() ?? 0;
+                  return ta - tb;
+                });
+
+              const idx = tier.findIndex((entry) => entry.id === user.uid);
+              setTierPosition(idx >= 0 ? idx + 1 : null);
+              setTierSize(tier.length);
+            } else {
+              setTierPosition(null);
+              setTierSize(null);
+            }
+          },
+          (queueError) => {
+            console.error('Error subscribing to active queue:', queueError);
+          }
+        );
 
         setLoading(false);
       } catch (err: any) {
@@ -150,6 +156,10 @@ export default function DashboardPage() {
     }
 
     loadData();
+
+    return () => {
+      if (unsubscribeQueue) unsubscribeQueue();
+    };
   }, [router]);
 
   async function handleUpdatePrice(e: React.FormEvent) {
@@ -199,33 +209,6 @@ export default function DashboardPage() {
       //  Sync queueEntries (server writes)
       await syncQueueEntryForCurrentUser();
 
-      // Refresh queue display from queueEntries
-      if (parsed > 0) {
-        const qTier = query(
-          collection(db, 'queueEntries'),
-          where('isActive', '==', true),
-          where('crownPrice', '==', parsed)
-        );
-
-        const tierSnap = await getDocs(qTier);
-        const tier: QueueEntry[] = tierSnap.docs.map((d) => ({
-          id: d.id,
-          ...(d.data() as any),
-        }));
-
-        tier.sort((a, b) => {
-          const ta = a.priceJoinedAt?.toMillis?.() ?? 0;
-          const tb = b.priceJoinedAt?.toMillis?.() ?? 0;
-          return ta - tb;
-        });
-
-        const idx = tier.findIndex((u) => u.id === user.uid);
-        setTierPosition(idx >= 0 ? idx + 1 : null);
-        setTierSize(tier.length);
-      } else {
-        setTierPosition(null);
-        setTierSize(null);
-      }
     } catch (err: any) {
       console.error('Error updating crown price:', err);
       setError(err?.message || 'Failed to update your Crown Price.');
@@ -277,6 +260,7 @@ export default function DashboardPage() {
           : prev
       );
       setPriceInput('0');
+      setHighestActiveCrownPrice(0);
       setTierPosition(null);
       setTierSize(null);
     } catch (err: any) {
@@ -308,8 +292,7 @@ export default function DashboardPage() {
   const hasPayment = Boolean(userProfile?.stripeCustomerId && userProfile.defaultPaymentMethodId);
 
   const yourPrice = userProfile?.crownPrice ?? 0;
-  const baseForNextPrice = currentHighestCrownPrice !== null ? currentHighestCrownPrice : yourPrice;
-  const nextPriceToTakeCrown = baseForNextPrice + 1;
+  const nextPriceToTakeCrown = highestActiveCrownPrice > 0 ? highestActiveCrownPrice + 1 : 1;
 
   const showQueueInfo = yourPrice > 0 && userProfile?.isActive;
 

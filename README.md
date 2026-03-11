@@ -59,6 +59,8 @@ Server:
 
 - Nightly settlement runs through `POST /api/cron/settle-crown` with header `x-cron-secret: <CRON_SECRET>`.
 - Settlement charges the top eligible active user, updates `crownStatus/current`, and records the active winner snapshot.
+- X draft generation runs via the Firebase scheduled function `prepareDailyXPostDraft` at `12:35 AM` America/Chicago and writes a draft document to `social_posts/x-YYYY-MM-DD`.
+- Admins can regenerate today's X draft on demand through `POST /api/admin/generate-x-post` or from the admin UI button.
 - Admin access is controlled by Firebase custom claim `admin: true` or by `ADMIN_UIDS`.
 - Payment routes are expected to be called with a Firebase ID token in the `Authorization: Bearer <token>` header.
 
