@@ -118,7 +118,7 @@ export default function HomePage() {
                   <img
                     src={heroImage}
                     alt={`${championName} featured`}
-                    className="h-full max-h-[520px] w-auto max-w-full rounded-[1.25rem] object-contain shadow-[0_20px_50px_rgba(15,23,42,0.18)]"
+                    className="h-[360px] w-auto max-w-full rounded-[1.25rem] object-contain shadow-[0_20px_50px_rgba(15,23,42,0.18)] sm:h-[520px]"
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center px-6 text-center text-sm text-slate-500">
