@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebaseClient';
-import PageHeader from '@/components/PageHeader';
 
 type CrownStatus = {
   // Public snapshot fields stored in /crownStatus/current
@@ -60,56 +59,18 @@ export default function HomePage() {
   const heroImage = featuredImageUrl || championPhoto;
 
   return (
-    <div className="wmi-container wmi-section">
-      <PageHeader
-        kicker="Daily Crown"
-        title="Today's Most Interesting Person"
-        subtitle="The title is claimed each midnight by Crown Price, then held in full view for one day."
-        subtitleClassName="hidden sm:block"
-        rightSlotClassName="hidden sm:block"
-        rightSlot={(
-          <Link
-            href="/how-it-works"
-            className="inline-flex items-center rounded-full border border-slate-300/80 bg-white/70 px-4 py-2 text-[11px] font-semibold text-slate-600 transition-colors hover:bg-white"
-          >
-            How it works {'->'}
-          </Link>
-        )}
-      />
+    <div className="wmi-container py-5 sm:py-8">
+      <section aria-labelledby="featured-person" className="wmi-card overflow-hidden border-slate-200/70">
+        <header className="px-5 pb-2 pt-5 sm:px-8 sm:pt-7">
+          <h1 id="featured-person" className="text-3xl font-bold leading-tight tracking-tight text-slate-950 sm:text-5xl">
+            {loading ? "Today's featured person" : championName}
+          </h1>
+          {loading && <p role="status" className="mt-2 text-sm text-slate-500">Loading today&apos;s champion...</p>}
+          {error && <p role="alert" className="mt-2 text-sm text-red-600">{error}</p>}
+        </header>
 
-      <div className="hidden sm:flex sm:mb-8 sm:mt-[-8px] sm:flex-wrap sm:gap-2 sm:text-[11px] sm:font-semibold sm:tracking-[0.03em] sm:text-slate-500">
-        <span className="rounded-full border border-slate-200 bg-white/75 px-3 py-1.5">Winner selected nightly</span>
-        <span className="rounded-full border border-slate-200 bg-white/75 px-3 py-1.5">Featured for 24 hours</span>
-      </div>
-
-      <section className="wmi-card overflow-hidden border-slate-200/70">
-        <div className="border-b border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(248,250,252,0.88))] p-5 sm:p-9">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-5">
-            <div className="min-w-0">
-              <p className="text-[10px] font-semibold tracking-[0.24em] text-slate-400">CURRENT M.I.P</p>
-
-              <h2 className="mt-2 text-[2.6rem] font-bold tracking-tight text-slate-950 sm:mt-3 sm:text-5xl">
-                {championName}
-              </h2>
-
-              <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-slate-500 sm:mt-3 sm:text-base">
-                One person holds the crown in full public view until the next nightly selection.
-              </p>
-
-              {loading && <p className="mt-2 text-[11px] text-slate-400 sm:mt-3">Loading today&apos;s champion...</p>}
-
-              {error && <p className="mt-2 text-[11px] text-red-600 sm:mt-3">{error}</p>}
-            </div>
-
-            <span className="inline-flex shrink-0 self-start rounded-full border border-slate-300/80 bg-white px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-700 shadow-sm">
-              Wearing The Crown
-            </span>
-          </div>
-        </div>
-
-        <div className="p-3 sm:p-8">
-          <div className="rounded-[1.5rem] border border-slate-200/80 bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] p-3 sm:rounded-[1.75rem] sm:p-6">
-            <div className="overflow-hidden rounded-[1.35rem] border border-slate-200/80 bg-[radial-gradient(circle_at_top,rgba(201,162,39,0.10),rgba(15,23,42,0.02)_45%,rgba(255,255,255,1)_100%)] px-3 py-3 sm:rounded-[1.5rem] sm:px-6 sm:py-7">
+        <div className="p-3 sm:px-8 sm:pb-8 sm:pt-4">
+            <div className="overflow-hidden rounded-[1.35rem] bg-[radial-gradient(circle_at_top,rgba(201,162,39,0.10),rgba(15,23,42,0.02)_45%,rgba(255,255,255,1)_100%)] p-3 sm:rounded-[1.5rem] sm:p-5">
               <div className="mx-auto flex min-h-[260px] max-w-[920px] items-center justify-center sm:min-h-[520px]">
                 {heroIsVideo ? (
                   <video src={featuredVideoUrl} controls className="h-full max-h-[520px] w-auto max-w-full rounded-[1.25rem] object-contain shadow-[0_20px_50px_rgba(15,23,42,0.18)]" />
@@ -127,7 +88,6 @@ export default function HomePage() {
                 )}
               </div>
             </div>
-          </div>
 
           <div className="mx-auto mt-4 max-w-4xl sm:mt-6">
             <p className="text-[1.05rem] leading-8 text-slate-700 sm:text-[1.45rem] sm:leading-10">
@@ -161,7 +121,19 @@ export default function HomePage() {
         </div>
       </section>
 
-      <div className="mt-10 text-center text-[11px] text-slate-400">The crown changes daily.</div>
+      <section aria-labelledby="daily-crown" className="px-2 pb-4 pt-8 sm:px-8 sm:pt-10">
+        <p className="wmi-kicker">Daily Crown</p>
+        <h2 id="daily-crown" className="mt-3 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
+          Today&apos;s Most Interesting Person
+        </h2>
+        <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-600 sm:text-base">
+          One homepage spot, a new opportunity every night. The highest eligible offer with a successful payment wins the next daily crown.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2 text-[11px] font-semibold text-slate-600">
+          <span className="rounded-full border border-slate-200 bg-white/75 px-3 py-1.5">Winner selected nightly</span>
+          <span className="rounded-full border border-slate-200 bg-white/75 px-3 py-1.5">Your photo and bio featured</span>
+        </div>
+      </section>
     </div>
   );
 }
