@@ -20,9 +20,9 @@ The webhook signing secret belongs in Firebase Secret Manager as STRIPE_WEBHOOK_
 
 ## Operations
 
-/admin uses the existing administrator Firebase account. It displays the latest 50 payments, links to Stripe for refunds, and lets the administrator pause checkout or change its closing time. Totals are not editable. Previously opened checkouts can complete within 30 minutes after a pause or closing time. Refunds/disputes can still change the result afterward.
+/admin uses the existing administrator Firebase account. It displays the latest 50 payments, links to Stripe for refunds, and lets the administrator pause checkout or change its closing time. Totals are not editable. Previously opened checkouts can complete within roughly half an hour after a pause or closing time. Refunds/disputes can still change the result afterward.
 
-Firestore collections: headlineExperiment/current (settings and aggregate totals), headlinePayments/{chargeId} (private ledger), and headlineRateLimits/{hash} (abuse limits; expiresAt TTL). All browser Firestore reads/writes are denied. Public totals are served by /api/experiment; admin routes verify Firebase tokens and admin claims/UIDs on the server.
+Firestore collections: headlineExperiment/current (settings and aggregate totals), headlinePayments/{chargeId} (private ledger), headlineRateLimits/{hash} (abuse limits), and headlineCheckoutRequests/{requestKey} (stable checkout expiry and session URL for retries). Both ephemeral collections use expiresAt TTL. All browser Firestore reads/writes are denied. Public totals are served by /api/experiment; admin routes verify Firebase tokens and admin claims/UIDs on the server.
 
 ## Deployment
 

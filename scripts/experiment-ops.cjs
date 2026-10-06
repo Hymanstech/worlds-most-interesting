@@ -62,7 +62,7 @@ async function main() {
       try {
         const data = await api(url);
         if (label === 'Schedulers') console.log(label, (data.jobs || []).map(j => ({ name: j.name, state: j.state })));
-        else { console.log(label, data.rulesetName); const rules = await api(`https://firebaserules.googleapis.com/v1/${data.rulesetName}`); fs.mkdirSync('secrets', { recursive: true }); fs.writeFileSync('secrets/firestore-rules-before-headline.json', JSON.stringify(rules, null, 2)); console.log('Existing rules backed up locally.'); }
+        else { console.log(label, data.rulesetName); const rules = await api(`https://firebaserules.googleapis.com/v1/${data.rulesetName}`); fs.mkdirSync('secrets', { recursive: true }); if (!fs.existsSync('secrets/firestore-rules-before-headline.json')) fs.writeFileSync('secrets/firestore-rules-before-headline.json', JSON.stringify(rules, null, 2)); console.log('Original rules backup retained locally.'); }
       } catch (e) { console.log(label, 'not accessible:', e.response?.status || e.code || e.name); }
     }
   } else if (action === 'provision-webhook') {
@@ -93,7 +93,7 @@ async function main() {
       await api(`https://cloudscheduler.googleapis.com/v1/${job.name}:pause`, 'POST', {});
       console.log('Paused legacy scheduler:', job.name);
     }
-  } else if (action === 'open') {
+  } else if (action === 'open' || action === 'verify-webhook') {
     const snap = await stateRef.get();
     const state = snap.data();
     if (state?.experimentId !== EXPERIMENT_ID || !state?.webhookEndpointId) throw new Error('Provision the experiment and webhook first');
@@ -107,13 +107,23 @@ async function main() {
     const signature = stripe.webhooks.generateTestHeaderString({ payload, secret: signingSecret });
     const verified = await fetch(webhookUrl, { method: 'POST', body: payload, headers: { 'Content-Type': 'application/json', 'Stripe-Signature': signature }, signal: AbortSignal.timeout(30000) });
     if (verified.status !== 200) throw new Error(`Signed webhook verification failed (HTTP ${verified.status})`);
+    if (action === 'verify-webhook') { console.log('Webhook verified: unsigned requests rejected, signed requests accepted. No charge or total mutation.'); return; }
     await stateRef.set({ webhookReady: true, paymentsEnabled: true, endsAt: state.endsAt || new Date(Date.now() + 7 * 86400000).toISOString(), updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
     console.log('Contributions opened. Checkout closes:', (await stateRef.get()).data().endsAt);
   } else if (action === 'close') {
     await stateRef.set({ paymentsEnabled: false }, { merge: true }); console.log('New contributions closed.');
   } else if (action === 'ttl') {
-    await api(`https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/collectionGroups/headlineRateLimits/fields/expiresAt?updateMask=ttlConfig`, 'PATCH', { ttlConfig: {} });
-    console.log('Rate-limit TTL configured.');
+    for (const collection of ['headlineRateLimits', 'headlineCheckoutRequests']) {
+      await api(`https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/collectionGroups/${collection}/fields/expiresAt?updateMask=ttlConfig`, 'PATCH', { ttlConfig: {} });
+    }
+    console.log('Rate-limit and checkout-request TTL configured.');
+  } else if (action === 'bridge-rules') {
+    // Keep only the old already-public editorial snapshot readable while the
+    // hosting deployment transitions. Private profiles/ledger remain denied.
+    const content = "rules_version = '2'; service cloud.firestore { match /databases/{database}/documents { match /crownStatus/current { allow read: if true; allow write: if false; } match /{document=**} { allow read, write: if false; } } }";
+    const ruleset = await api(`https://firebaserules.googleapis.com/v1/projects/${projectId}/rulesets`, 'POST', { source: { files: [{ name: 'firestore.rules', content }] } });
+    await api(`https://firebaserules.googleapis.com/v1/projects/${projectId}/releases/cloud.firestore?updateMask=rulesetName`, 'PATCH', { release: { name: `projects/${projectId}/releases/cloud.firestore`, rulesetName: ruleset.name } });
+    console.log('Temporary read-only editorial snapshot bridge active; private data remains denied.');
   } else throw new Error('Unknown action');
 }
 main().catch(e => { console.error('Operation failed:', e.response?.status || e.code || e.name, e.type === 'StripeAuthenticationError' ? 'Stripe authentication rejected' : e.message?.replace(/(?:sk|whsec)_[\w]+/g, '[redacted]').slice(0, 400)); process.exitCode = 1; }).finally(() => admin.app().delete());

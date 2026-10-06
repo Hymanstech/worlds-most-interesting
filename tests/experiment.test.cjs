@@ -91,3 +91,15 @@ test('webhook signatures reject tampered requests', () => {
   assert.equal(stripe.webhooks.constructEvent(payload, header, secret).id, 'evt_fake');
   assert.throws(() => stripe.webhooks.constructEvent(payload + ' ', header, secret));
 });
+test('checkout retries on another server retain the original expiry and reuse the saved URL', async () => {
+  const f = fixture();
+  const server = load('src/lib/experimentServer.ts', { '@/lib/firebaseAdmin': { adminDb: f.db, adminAuth: {}, adminFieldValue: { serverTimestamp: () => 'timestamp' } }, '@/lib/experiment': core });
+  const first = await server.reserveCheckoutRequest('yes', 500, 'request-one', 1000000);
+  const retry = await server.reserveCheckoutRequest('yes', 500, 'request-one', 1010000);
+  assert.equal(first.expiresAtSeconds, retry.expiresAtSeconds);
+  f.documents.set(first.ref.path, { ...f.documents.get(first.ref.path), sessionUrl: 'https://checkout.stripe.com/c/pay/cs_example' });
+  const cached = await server.reserveCheckoutRequest('yes', 500, 'request-one', 1020000);
+  assert.equal(cached.sessionUrl, 'https://checkout.stripe.com/c/pay/cs_example');
+  const otherSide = await server.reserveCheckoutRequest('no', 500, 'request-one', 1030000);
+  assert.notEqual(first.ref.path, otherSide.ref.path);
+});

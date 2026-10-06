@@ -1,10 +1,24 @@
 import { createHash } from 'node:crypto';
-import { adminAuth, adminDb } from '@/lib/firebaseAdmin';
-import { isOpen, readState } from '@/lib/experiment';
+import { adminAuth, adminDb, adminFieldValue } from '@/lib/firebaseAdmin';
+import { isOpen, readState, type Side } from '@/lib/experiment';
 
 export async function getExperimentState() {
   const snap = await adminDb.collection('headlineExperiment').doc('current').get();
   return readState(snap.data());
+}
+
+export async function reserveCheckoutRequest(side: Side, amountCents: number, requestId: string, now = Date.now()) {
+  const ref = adminDb.collection('headlineCheckoutRequests').doc(`${requestId}-${side}-${amountCents}`);
+  const request = await adminDb.runTransaction(async tx => {
+    const snap = await tx.get(ref);
+    const existing = snap.data();
+    if (existing) return { expiresAtSeconds: Number(existing.expiresAtSeconds), sessionUrl: typeof existing.sessionUrl === 'string' ? existing.sessionUrl : null };
+    const created = { side, amountCents, expiresAtSeconds: Math.floor(now / 1000) + 1860,
+      expiresAt: new Date(now + 48 * 3600000), sessionUrl: null, createdAt: adminFieldValue.serverTimestamp() };
+    tx.set(ref, created);
+    return { expiresAtSeconds: created.expiresAtSeconds, sessionUrl: created.sessionUrl };
+  });
+  return { ref, ...request };
 }
 
 export function publicState(state: ReturnType<typeof readState>) {

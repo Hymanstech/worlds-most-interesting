@@ -89,8 +89,8 @@ export default function HeadlineExperiment({ initialState }: { initialState: Pub
     try {
       requestKey.current ||= crypto.randomUUID();
       const response = await fetch('/api/checkout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ side: selected, amountCents, acceptedTerms: accepted, requestId: requestKey.current }), signal: AbortSignal.timeout(30000) });
-      const data = await response.json();
-      if (!response.ok || !data.url) throw new Error(data.error || 'Checkout could not be opened. Please try again.');
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.url) throw new Error(data?.error || 'Secure checkout could not be reached. Please try again.');
       const url = new URL(data.url);
       if (url.protocol !== 'https:' || url.hostname !== 'checkout.stripe.com') throw new Error('Checkout returned an invalid destination.');
       window.location.assign(url.href);
@@ -116,7 +116,7 @@ export default function HeadlineExperiment({ initialState }: { initialState: Pub
       <div className="duel-battle-foot"><span>{state ? total === 0 ? 'No paid contributions yet. YES starts with the crown. First payment moves the total.' : `One word changes everything. ${sideName(trailing)} needs ${money(gap)} to take over${gap < 100 ? ' ($1 minimum payment)' : ''}.` : 'Waiting for verified totals.'}</span><span>One-time payments · No account needed · $1–$500</span></div>
       <p className="duel-payment-note">Payments go to the independent site operator. No prizes, payouts, or campaign donations. A payment adds to your side’s total; it does not guarantee a lead.</p>
       {!open && state && !loadError && <p className="duel-closed" role="status">Contributions are closed. The headline remains on display.</p>}
-      {endLabel && <p className="duel-end">{open ? 'New checkouts close' : 'Checkout closing time'}: {endLabel}. Previously opened checkouts can finish within their 30-minute window.</p>}
+      {endLabel && <p className="duel-end">{open ? 'New checkouts close' : 'Checkout closing time'}: {endLabel}. Previously opened checkouts can finish within their roughly half-hour window.</p>}
     </section>
     <section className="duel-bio" aria-labelledby="bio-title"><div><p className="duel-eyebrow">{isNo ? 'The reality-check version · ADD THE NOT' : 'The flattering version · KEEP THE CROWN'}</p><h2 id="bio-title">{isNo ? <>All that attention.<br />Still no crown.</> : <>Hard to ignore.<br />Harder to out-headline.</>}</h2><p className="duel-punchline">{isNo ? 'Being the topic is not the same as being the point.' : 'Some people enter a room. He enters the news cycle.'}</p><small>Editorial humor written for this page</small></div><div className="duel-bio-copy">
       <p>{isNo ? 'Businessman. Television personality. Twice elected president. The résumé is public. The superlative is up for argument—and this side would like a word. Specifically: NOT.' : 'Businessman. Television personality. Twice elected to the American presidency. Donald Trump’s career has crossed boardrooms, living rooms, and the Oval Office.'}</p>

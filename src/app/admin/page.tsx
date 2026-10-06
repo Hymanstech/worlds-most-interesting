@@ -39,7 +39,7 @@ export default function ExperimentAdmin() {
     try {
       const response = await fetch('/api/admin/experiment', { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` }, body: JSON.stringify({ paymentsEnabled: enabled, endsAt: endTime ? new Date(endTime).toISOString() : null }) });
       const data = await response.json(); if (!response.ok) throw new Error(data.error);
-      setMessage('Settings saved. Existing checkouts can still finish within their 30-minute window.'); await load();
+      setMessage('Settings saved. Existing checkouts can still finish within their roughly half-hour window.'); await load();
     } catch (e) { setMessage(e instanceof Error ? e.message : 'Could not save.'); } finally { setBusy(false); }
   }
   return <div className="experiment-admin"><h1>Headline control room</h1>
