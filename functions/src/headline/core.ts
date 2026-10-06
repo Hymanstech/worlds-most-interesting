@@ -8,16 +8,19 @@ export function isSide(value: unknown): value is Side {
 
 export function validAmount(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) &&
-    value >= MIN_AMOUNT_CENTS;
+    value >= MIN_AMOUNT_CENTS && value % 100 === 0;
 }
 
 export function parseUsdAmount(value: string): number | null {
-  if (!/^\d+(\.\d{1,2})?$/.test(value)) return null;
-  const [dollars, fraction = ''] = value.split('.');
-  const digits = (dollars + fraction.padEnd(2, '0')).replace(/^0+/, '') || '0';
+  if (!/^\d+$/.test(value)) return null;
+  const digits = (value + '00').replace(/^0+/, '') || '0';
   if (digits.length > 16) return null;
   const cents = Number(digits);
   return Number.isSafeInteger(cents) ? cents : null;
+}
+
+export function wholeDollarTakeoverCents(gapCents: number): number {
+  return Math.max(100, Math.ceil(gapCents / 100) * 100);
 }
 
 export function winningSide(yes: number, no: number, incumbent: Side = 'yes'): Side {
