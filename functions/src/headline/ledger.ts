@@ -1,5 +1,5 @@
 import type Stripe from 'stripe';
-import { FieldValue, type Firestore } from 'firebase-admin/firestore';
+import type { Firestore } from 'firebase-admin/firestore';
 import { countedAmount, EXPERIMENT_ID, isSide, readState, winningSide } from './core';
 
 // A charge is the unique accounting key. Both webhooks and the return page can
@@ -48,13 +48,17 @@ export async function reconcileCharge(db: Firestore, stripe: Stripe, chargeId: s
         chargeId, side, amountCents: charge.amount_captured, refundedCents,
         countedCents: effectiveCents, disputeStatus: disputeStatus || null,
         paymentIntentId: typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id || null,
-        livemode: charge.livemode, createdAt: previous.createdAt || FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
+        // Plain dates serialize through the caller's SDK even when the website
+        // and Functions install separate copies of firebase-admin. Never pass
+        // one package's FieldValue sentinel to another package's Firestore.
+        livemode: charge.livemode,
+        createdAt: previous.createdAt || new Date(Number.isFinite(charge.created) ? charge.created * 1000 : Date.now()),
+        updatedAt: new Date(),
       }, { merge: true });
       tx.set(stateRef, {
         yesCents, noCents, winner,
         paymentCount: state.paymentCount + (paymentSnap.exists ? 0 : 1),
-        updatedAt: FieldValue.serverTimestamp(),
+        updatedAt: new Date(),
       }, { merge: true });
     }
     return { side, amountCents: charge.amount_captured, countedCents: effectiveCents, winner };
