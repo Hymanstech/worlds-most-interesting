@@ -34,14 +34,14 @@ export async function POST(request: Request) {
       mode: 'payment', payment_method_types: ['card'], submit_type: 'pay',
       line_items: [{ quantity: 1, price_data: {
         currency: 'usd', unit_amount: body.amountCents,
-        product_data: { name: `${name} — headline contribution`, description: 'Satirical entertainment: add to your side’s total. No guaranteed win or display time. All sales final except where required by law.' },
+        product_data: { name: `${name} — headline points`, description: 'Satirical entertainment: $1 buys 1 point. Starting scores YES 1764 / NO 1763 are not previous purchases. No guaranteed win or display time. All sales final except where required by law.' },
       } }],
-      metadata: { experiment: EXPERIMENT_ID, side: body.side, termsVersion: '2026-10-06-final-sales' },
-      payment_intent_data: { metadata: { experiment: EXPERIMENT_ID, side: body.side, termsVersion: '2026-10-06-final-sales' }, description: `WMI headline experiment: ${name}` },
+      metadata: { experiment: EXPERIMENT_ID, side: body.side, termsVersion: '2026-10-06-points' },
+      payment_intent_data: { metadata: { experiment: EXPERIMENT_ID, side: body.side, termsVersion: '2026-10-06-points' }, description: `WMI headline experiment: ${name}` },
       success_url: `${siteOrigin()}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${siteOrigin()}/?checkout=cancelled`,
       expires_at: checkoutRequest.expiresAtSeconds,
-      custom_text: { submit: { message: 'Satire for entertainment. Your payment increases your side’s total, not a guaranteed win or display time. All sales final and non-refundable except where required by law. No financial return or campaign donation.' } },
+      custom_text: { submit: { message: 'Satire for entertainment. Each $1 buys 1 point. Starting scores are YES 1764 / NO 1763, not previous purchases. This buys points, not a guaranteed win or display time. All sales final and non-refundable except where required by law. No financial return or campaign donation.' } },
     }, { idempotencyKey: `${EXPERIMENT_ID}:${body.requestId}:${body.side}:${body.amountCents}` });
     await checkoutRequest.ref.set({ sessionId: session.id, sessionUrl: session.url }, { merge: true });
     return NextResponse.json({ url: session.url });

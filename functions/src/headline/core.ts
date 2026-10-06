@@ -42,6 +42,11 @@ export type ExperimentState = {
   yesCents: number;
   noCents: number;
   yesStartingCreditCents: number;
+  scoringMode: 'points' | 'legacy';
+  yesStartingPoints: number;
+  noStartingPoints: number;
+  yesScoreCents: number;
+  noScoreCents: number;
   winner: Side;
   paymentCount: number;
   paymentsEnabled: boolean;
@@ -54,11 +59,18 @@ export function readState(raw: Record<string, unknown> = {}): ExperimentState {
   const yesCents = cents(raw.yesCents);
   const noCents = cents(raw.noCents);
   const yesStartingCreditCents = cents(raw.yesStartingCreditCents);
+  const scoringMode = raw.scoringMode === 'points' ? 'points' : 'legacy';
+  const yesStartingPoints = scoringMode === 'points' ? cents(raw.yesStartingPoints) : 0;
+  const noStartingPoints = scoringMode === 'points' ? cents(raw.noStartingPoints) : 0;
+  const yesScoreCents = scoringMode === 'points' ? yesStartingPoints * 100 + Math.max(0, yesCents - yesStartingCreditCents) : yesCents;
+  const noScoreCents = scoringMode === 'points' ? noStartingPoints * 100 + noCents : noCents;
+  if (!Number.isSafeInteger(yesScoreCents) || !Number.isSafeInteger(noScoreCents)) throw new Error('Score exceeds safe integer range');
   return {
     experimentId: typeof raw.experimentId === 'string' ? raw.experimentId : EXPERIMENT_ID,
     mode: typeof raw.mode === 'string' ? raw.mode : 'headline-duel',
     yesCents, noCents, yesStartingCreditCents,
-    winner: experimentWinner(yesCents, noCents, isSide(raw.winner) ? raw.winner : 'yes', yesStartingCreditCents),
+    scoringMode, yesStartingPoints, noStartingPoints, yesScoreCents, noScoreCents,
+    winner: scoringMode === 'points' ? winningSide(yesScoreCents, noScoreCents, isSide(raw.winner) ? raw.winner : 'yes') : experimentWinner(yesCents, noCents, isSide(raw.winner) ? raw.winner : 'yes', yesStartingCreditCents),
     paymentCount: cents(raw.paymentCount),
     paymentsEnabled: raw.paymentsEnabled === true,
     endsAt: typeof raw.endsAt === 'string' && Number.isFinite(Date.parse(raw.endsAt)) ? raw.endsAt : null,

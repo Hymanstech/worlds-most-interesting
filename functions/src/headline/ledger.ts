@@ -1,6 +1,6 @@
 import type Stripe from 'stripe';
 import type { Firestore } from 'firebase-admin/firestore';
-import { countedAmount, EXPERIMENT_ID, isSide, readState, experimentWinner } from './core';
+import { countedAmount, EXPERIMENT_ID, isSide, readState } from './core';
 
 // A charge is the unique accounting key. Both webhooks and the return page can
 // reconcile it safely, including refunds/disputes delivered before completion.
@@ -42,7 +42,7 @@ export async function reconcileCharge(db: Firestore, stripe: Stripe, chargeId: s
     if (!Number.isSafeInteger(yesCents) || !Number.isSafeInteger(noCents) || yesCents < 0 || noCents < 0) {
       throw new Error('Ledger total invariant failed');
     }
-    const winner = experimentWinner(yesCents, noCents, state.winner, state.yesStartingCreditCents);
+    const winner = readState({ ...state, yesCents, noCents }).winner;
     if (!paymentSnap.exists || delta !== 0 || previous.disputeStatus !== (disputeStatus || null) || previous.refundedCents !== refundedCents) {
       tx.set(ref, {
         chargeId, side, amountCents: charge.amount_captured, refundedCents,

@@ -126,6 +126,18 @@ async function main() {
     if (action === 'verify-webhook') { console.log('Webhook verified: unsigned requests rejected, signed requests accepted. No charge or total mutation.'); return; }
     await stateRef.set({ webhookReady: true, paymentsEnabled: true, endsAt: state.endsAt || new Date(Date.now() + 7 * 86400000).toISOString(), updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
     console.log('Contributions opened. Checkout closes:', (await stateRef.get()).data().endsAt);
+  } else if (action === 'start-points') {
+    await db.runTransaction(async tx => {
+      const snap = await tx.get(stateRef);
+      const state = snap.data();
+      if (state?.experimentId !== EXPERIMENT_ID) throw new Error('Wrong experiment');
+      // The deployed worker compares the paid totals plus the old $1 credit.
+      // These starting scores have that same one-point difference, so ties
+      // and winners remain compatible without changing real payment totals.
+      if (state.yesStartingCreditCents !== 100) throw new Error('Expected existing $1 credit for compatible scoring');
+      tx.set(stateRef, { scoringMode: 'points', yesStartingPoints: 1764, noStartingPoints: 1763, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    });
+    console.log('Starting scores set to YES 1764 / NO 1763 points. Real payment amounts and counts unchanged.');
   } else if (action === 'close') {
     await stateRef.set({ paymentsEnabled: false }, { merge: true }); console.log('New contributions closed.');
   } else if (action === 'ttl') {

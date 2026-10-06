@@ -33,7 +33,7 @@ async function main() {
       }
     }
     const first = await nextTotals();
-    for (const key of Object.keys(first)) assert.ok(['yesCents', 'noCents', 'winner', 'yesStartingCreditCents', 'noMinimumToWinCents', 'paymentsOpen', 'endsAt', 'paymentCount'].includes(key), 'Only public fields may be streamed');
+    for (const key of Object.keys(first)) assert.ok(['scoringMode', 'yesScoreCents', 'noScoreCents', 'yesStartingPoints', 'noStartingPoints', 'yesPaidCents', 'noPaidCents', 'yesCents', 'noCents', 'winner', 'yesStartingCreditCents', 'noMinimumToWinCents', 'paymentsOpen', 'endsAt', 'paymentCount'].includes(key), 'Only public fields may be streamed');
     const started = Date.now();
     await ref.update({ updatedAt: admin.firestore.FieldValue.serverTimestamp() });
     const next = await nextTotals();

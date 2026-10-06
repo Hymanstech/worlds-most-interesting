@@ -1,6 +1,6 @@
 # World’s Most Interesting Person
 
-A guest-checkout headline experiment built with Next.js, Firebase, and Stripe. KEEP THE CROWN (YES) and ADD THE NOT (NO) fund two alternate homepage treatments. Higher cumulative confirmed payments control the headline, image, and bio. Ties retain the incumbent; the initial incumbent is YES.
+A guest-checkout headline experiment built with Next.js, Firebase, and Stripe. KEEP THE CROWN (YES) and ADD THE NOT (NO) fund two alternate homepage treatments. The higher point score controls the headline, image, and bio. Each confirmed USD dollar buys one point; disclosed starting scores are YES 1,764 / NO 1,763. Ties retain the incumbent; the initial incumbent is YES.
 
 ## Development
 
@@ -30,4 +30,4 @@ The existing DigitalOcean app builds origin/main automatically. The webhook and 
 
 Legacy daily-crown source and historical user records are retained. The Next.js proxy redirects old account/profile pages and returns HTTP 410 for retired payment/settlement/admin endpoints. Legacy Cloud Scheduler jobs must remain paused; the new function guards also refuse to run while headline-duel mode is active. No existing saved cards are charged.
 
-The standalone first-pass mockup remains under public/mockup and is explicitly demo-only. YES includes a disclosed $1 operator starting credit; NO must reach $2 and outscore YES. All other totals reflect verified payments. Public updates stream through /api/experiment/events, with a one-second polling fallback during connection interruptions.
+The standalone first-pass mockup remains under public/mockup and is explicitly demo-only. Starting points are separate from actual paid dollars. Scores begin at YES 1,764 / NO 1,763; $1 buys one additional point. The old $1 credit remains only in internal aggregate accounting for webhook compatibility and is excluded from paid revenue. See docs/points-scoring.md. Public updates stream through /api/experiment/events, with a one-second polling fallback during connection interruptions.

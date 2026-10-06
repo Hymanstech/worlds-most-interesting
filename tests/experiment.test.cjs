@@ -60,6 +60,28 @@ test('live stream publishes changing public totals and unsubscribes on cancellat
 });
 test('ties preserve the incumbent including a NO incumbent', () => { assert.equal(core.winningSide(500, 500, 'no'), 'no'); assert.equal(core.winningSide(0, 0), 'yes'); });
 
+test('starting points are separate from payments; $1 ties, $1.01 overtakes, and $3 buys three points', () => {
+  const raw = { scoringMode: 'points', yesStartingPoints: 1764, noStartingPoints: 1763, yesStartingCreditCents: 100, yesCents: 100, noCents: 0, winner: 'yes' };
+  const state = core.readState(raw);
+  assert.equal(state.yesScoreCents, 176400); assert.equal(state.noScoreCents, 176300); assert.equal(state.paymentCount, 0);
+  assert.equal(core.readState({ ...raw, noCents: 100 }).winner, 'yes');
+  assert.equal(core.readState({ ...raw, noCents: 101 }).winner, 'no');
+  assert.equal(core.readState({ ...raw, noCents: 300 }).noScoreCents, 176600);
+  for (const yes of [0, 100, 101, 99999]) for (const no of [0, 100, 101, 99999]) for (const incumbent of ['yes', 'no']) {
+    const nativeWinner = core.winningSide(yes + 100, no, incumbent);
+    assert.equal(core.readState({ ...raw, yesCents: yes + 100, noCents: no, winner: incumbent }).winner, nativeWinner, 'Compatible with deployed webhook ties and winners');
+  }
+});
+
+test('points accounting preserves starting scores through purchases, duplicates, ties, and refunds', async () => {
+  const f = fixture(); Object.assign(f.state(), { scoringMode: 'points', yesStartingPoints: 1764, noStartingPoints: 1763, yesStartingCreditCents: 100, yesCents: 100 });
+  f.charge.metadata.side = 'no'; f.charge.amount_captured = 300;
+  await ledger.reconcileCharge(f.db, f.stripe, 'ch_points'); await ledger.reconcileCharge(f.db, f.stripe, 'ch_points');
+  assert.equal(core.readState(f.state()).noScoreCents, 176600); assert.equal(f.state().paymentCount, 1); assert.equal(f.state().noCents, 300);
+  f.charge.amount_refunded = 300; await ledger.reconcileCharge(f.db, f.stripe, 'ch_points');
+  assert.equal(core.readState(f.state()).noScoreCents, 176300); assert.equal(core.readState(f.state()).yesScoreCents, 176400); assert.equal(f.state().winner, 'yes');
+});
+
 test('the disclosed $1 credit requires NO to reach $2, including fractional totals and old webhook winner values', () => {
   for (const noCents of [0, 100, 101, 199]) {
     assert.equal(core.readState({ yesCents: 100, noCents, yesStartingCreditCents: 100, winner: 'no' }).winner, 'yes');

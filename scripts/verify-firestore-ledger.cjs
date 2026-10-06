@@ -2,6 +2,7 @@ require('@next/env').loadEnvConfig(process.cwd());
 const admin = require('firebase-admin');
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
+const { readState } = require('../functions/lib/headline/core.js');
 const { reconcileCharge } = require('../functions/lib/headline/ledger.js');
 const credentials = process.env.FIREBASE_ADMIN_JSON ? JSON.parse(process.env.FIREBASE_ADMIN_JSON) : null;
 if (credentials?.private_key) credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
@@ -13,7 +14,7 @@ const stateRef = isolated.collection('headlineExperiment').doc('current');
 const paymentRef = isolated.collection('headlinePayments').doc('ch_sdk_validation');
 const noPaymentRef = isolated.collection('headlinePayments').doc('ch_no_validation');
 async function main() {
-  await stateRef.set({ experimentId: 'trump-headline-v1', mode: 'headline-duel', yesCents: 100, yesStartingCreditCents: 100, noCents: 0, winner: 'yes', paymentCount: 0 });
+  await stateRef.set({ experimentId: 'trump-headline-v1', mode: 'headline-duel', scoringMode: 'points', yesStartingPoints: 1764, noStartingPoints: 1763, yesCents: 100, yesStartingCreditCents: 100, noCents: 0, winner: 'yes', paymentCount: 0 });
   const charge = { metadata: { experiment: 'trump-headline-v1', side: 'yes' }, currency: 'usd', status: 'succeeded', paid: true, captured: true, amount_captured: 500, amount_refunded: 0, disputed: false, payment_intent: 'pi_sdk_validation', livemode: false, created: Math.floor(Date.now()/1000) };
   const provider = { charges: { retrieve: async () => charge }, refunds: { list: async function* () { yield { status: 'succeeded', amount: charge.amount_refunded }; } } };
   await Promise.all([reconcileCharge(isolated, provider, 'ch_sdk_validation'), reconcileCharge(isolated, provider, 'ch_sdk_validation')]);
@@ -22,15 +23,15 @@ async function main() {
   charge.amount_refunded = 500;
   await reconcileCharge(isolated, provider, 'ch_sdk_validation');
   state = (await stateRef.get()).data(); assert.equal(state.yesCents, 100);
-  charge.metadata.side = 'no'; charge.amount_captured = 200; charge.amount_refunded = 1;
+  charge.metadata.side = 'no'; charge.amount_captured = 200; charge.amount_refunded = 100;
   await reconcileCharge(isolated, provider, 'ch_no_validation');
-  state = (await stateRef.get()).data(); assert.equal(state.noCents, 199); assert.equal(state.winner, 'yes');
-  charge.amount_refunded = 0;
+  state = (await stateRef.get()).data(); assert.equal(state.noCents, 100); assert.equal(readState(state).noScoreCents, 176400); assert.equal(state.winner, 'yes');
+  charge.amount_refunded = 99;
   await reconcileCharge(isolated, provider, 'ch_no_validation');
-  state = (await stateRef.get()).data(); assert.equal(state.noCents, 200); assert.equal(state.winner, 'no');
+  state = (await stateRef.get()).data(); assert.equal(state.noCents, 101); assert.equal(readState(state).noScoreCents, 176401); assert.equal(state.winner, 'no');
   charge.amount_refunded = 200;
   await reconcileCharge(isolated, provider, 'ch_no_validation');
   state = (await stateRef.get()).data(); assert.equal(state.noCents, 0); assert.equal(state.winner, 'yes'); assert.equal(state.yesCents, 100); assert.equal(state.paymentCount, 2);
-  console.log('Real Firestore SDK integration passed: concurrent reconciliation, starting-credit preservation, exact $2 NO threshold, and refund reversals. Synthetic provider data, isolated records, no customer charges or public total changes.');
+  console.log('Real Firestore SDK integration passed: concurrent reconciliation, starting-credit preservation, starting points and exact $1.01 NO takeover, and refund reversals. Synthetic provider data, isolated records, no customer charges or public total changes.');
 }
 main().catch(error => { console.error('SDK integration failed:', error.message.slice(0,350)); process.exitCode = 1; }).finally(async () => { await paymentRef.delete(); await noPaymentRef.delete(); await stateRef.delete(); await admin.app().delete(); });
