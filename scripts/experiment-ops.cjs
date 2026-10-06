@@ -85,6 +85,22 @@ async function main() {
       tx.set(stateRef, { experimentId: EXPERIMENT_ID, mode: 'headline-duel', yesCents: 0, noCents: 0, winner: 'yes', paymentCount: 0, paymentsEnabled: false, webhookReady: false, endsAt: null, createdAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
     });
     console.log('Experiment initialized with zero real totals and checkout closed.');
+  } else if (action === 'seed-crown') {
+    await db.runTransaction(async tx => {
+      const snap = await tx.get(stateRef);
+      const state = snap.data();
+      if (state?.experimentId !== EXPERIMENT_ID) throw new Error('Initialize the experiment first');
+      if (state.yesStartingCreditCents === 100) return;
+      if (state.yesStartingCreditCents) throw new Error('Unexpected existing starting credit');
+      if (!Number.isSafeInteger(state.yesCents) || state.yesCents < 0 || !Number.isSafeInteger(state.noCents) || state.noCents < 0) throw new Error('Invalid existing totals');
+      const yesCents = state.yesCents + 100;
+      if (!Number.isSafeInteger(yesCents)) throw new Error('Total exceeds safe integer range');
+      const winner = state.noCents < 200 || yesCents > state.noCents ? 'yes' : state.noCents > yesCents ? 'no' : state.winner;
+      tx.set(stateRef, { yesCents, yesStartingCreditCents: 100, winner, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    });
+    const state = (await stateRef.get()).data();
+    console.log(JSON.stringify({ yesCents: state.yesCents, noCents: state.noCents, yesStartingCreditCents: state.yesStartingCreditCents, paymentCount: state.paymentCount }));
+    console.log('Disclosed $1 starting credit applied once. Existing payments preserved; no customer charge created.');
   } else if (action === 'pause-legacy') {
     const jobs = await api(`https://cloudscheduler.googleapis.com/v1/projects/${projectId}/locations/us-central1/jobs`);
     for (const job of jobs.jobs || []) {

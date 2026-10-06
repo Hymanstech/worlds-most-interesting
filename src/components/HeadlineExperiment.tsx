@@ -3,13 +3,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 type Side = 'yes' | 'no';
-type PublicState = { yesCents: number; noCents: number; winner: Side; paymentsOpen: boolean; endsAt: string | null; paymentCount: number };
+type PublicState = { yesCents: number; noCents: number; yesStartingCreditCents: number; noMinimumToWinCents: number; winner: Side; paymentsOpen: boolean; endsAt: string | null; paymentCount: number };
 const money = (cents: number) => (cents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 const sideName = (side: Side) => side === 'yes' ? 'KEEP THE CROWN' : 'ADD THE NOT';
 export default function HeadlineExperiment({ initialState }: { initialState: PublicState | null }) {
   const [state, setState] = useState(initialState);
   const [loadError, setLoadError] = useState('');
   const [selected, setSelected] = useState<Side>('yes');
+  const [previewSide, setPreviewSide] = useState<Side | null>(null);
   const [amount, setAmount] = useState('5');
   const [accepted, setAccepted] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -68,17 +69,24 @@ export default function HeadlineExperiment({ initialState }: { initialState: Pub
     void verify();
     return () => { stopped = true; clearTimeout(timeout); };
   }, [refresh]);
-  const isNo = state?.winner === 'no';
+  const liveIsNo = state?.winner === 'no';
+  const isNo = (previewSide ?? state?.winner ?? 'yes') === 'no';
   const total = (state?.yesCents || 0) + (state?.noCents || 0);
   const yesPercent = total ? (state!.yesCents / total) * 100 : 50;
   const open = !!state?.paymentsOpen && !loadError && (!state.endsAt || now < Date.parse(state.endsAt));
-  const gap = state ? Math.abs(state.yesCents - state.noCents) + 1 : 0;
-  const trailing: Side = isNo ? 'yes' : 'no';
+  const gap = state ? liveIsNo ? state.noCents - state.yesCents + 1 : Math.max(state.yesCents - state.noCents + 1, (state.noMinimumToWinCents || 0) - state.noCents) : 0;
+  const trailing: Side = liveIsNo ? 'yes' : 'no';
   const flipMinimum = Math.max(100, gap);
   const endLabel = state?.endsAt ? new Date(state.endsAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago', timeZoneName: 'short' }) : null;
   function choose(side: Side) {
     setSelected(side); setAmount('5'); setAccepted(false); setCheckoutError(''); requestKey.current = null;
     dialog.current?.showModal();
+  }
+  function preview(side: Side) {
+    if (busy) return;
+    dialog.current?.close();
+    setPreviewSide(side); setShareMessage('');
+    requestAnimationFrame(() => document.getElementById('winning-preview')?.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }));
   }
   async function checkout(event: React.FormEvent) {
     event.preventDefault(); if (busy) return;
@@ -97,23 +105,24 @@ export default function HeadlineExperiment({ initialState }: { initialState: Pub
     } catch (error) { setCheckoutError(error instanceof Error ? error.message : 'Could not connect to checkout.'); setBusy(false); }
   }
   async function share() {
-    try { await navigator.clipboard.writeText(`Donald Trump is ${isNo ? 'NOT ' : ''}the world’s most interesting person. For now. ${window.location.origin}/`); setShareMessage('Headline and link copied.'); }
+    try { await navigator.clipboard.writeText(`Donald Trump is ${liveIsNo ? 'NOT ' : ''}the world’s most interesting person. For now. ${window.location.origin}/`); setShareMessage('Live headline and link copied.'); }
     catch { setShareMessage(`Share this page: ${window.location.origin}/`); }
   }
   return <div className={`duel ${isNo ? 'duel-no' : ''}`}><div className="duel-wrap">
     <div className="duel-edition"><span>A very public difference of opinion.</span><span className="duel-live">{state ? `${sideName(state.winner)} is winning` : 'Connecting to live totals'}</span></div>
     {paymentMessage && <div className="duel-notice" role="status">{paymentMessage}</div>}
     {loadError && <div className="duel-notice duel-error" role="alert">{loadError} <button onClick={() => void refresh()}>Try again</button></div>}
+    {previewSide && <div className="duel-preview-banner" id="winning-preview" role="status"><div><strong>PREVIEW · IF {sideName(previewSide)} WINS</strong><p>This is its headline, photo, and bio. Live totals stay unchanged. {state && `The live winner is ${sideName(state.winner)}.`}</p></div><button type="button" onClick={() => { setPreviewSide(null); setShareMessage(''); }}>Back to the live page</button></div>}
     <section className="duel-hero" aria-labelledby="headline"><div><p className="duel-eyebrow">One crown. One word. You decide.</p>
       <h1 id="headline">Donald Trump<br />is {isNo && <span className="duel-not">NOT</span>} the world’s<br />most <em>interesting</em><br />person.</h1>
       <p className="duel-intro">{isNo ? 'The internet has purchased a correction. Same Donald. Less pedestal. One tiny word doing a tremendous amount of work.' : 'Love him. Roll your eyes at him. Somehow, we’re still talking about him. The crown stays—until someone buys the NOT.'}</p>
-      <div className="duel-status">{isNo ? '✕' : '♛'} &nbsp; {state ? `${sideName(state.winner)} holds the headline` : 'The starting headline · totals loading'}</div>
-      <div className="duel-share"><button onClick={share}>Copy this headline ↗</button><span role="status">{shareMessage}</span></div></div>
-      <figure className="duel-photo"><Image src={`/mockup/assets/${isNo ? 'mugshot.jpg' : 'portrait.png'}`} alt={isNo ? 'Donald Trump’s August 24, 2023 Fulton County booking photo' : 'Official presidential portrait of Donald Trump'} fill priority sizes="(max-width: 760px) 100vw, 50vw" /><div className="duel-stamp">{isNo ? 'THE CROWN HAS BEEN REVOKED' : 'THE REIGNING OPINION'}</div><figcaption><span>{isNo ? 'Courtesy of ADD THE NOT · August 24, 2023' : 'Courtesy of KEEP THE CROWN'}</span><strong>{isNo ? 'A different kind of photo op.' : 'The man. The myth. The headlines.'}</strong></figcaption></figure>
+      <div className="duel-status">{isNo ? '✕' : '♛'} &nbsp; {previewSide ? `${sideName(previewSide)} winning version · PREVIEW` : state ? `${sideName(state.winner)} holds the headline` : 'The starting headline · totals loading'}</div>
+      <div className="duel-share"><button onClick={share}>{previewSide ? 'Copy the live headline ↗' : 'Copy this headline ↗'}</button><span role="status">{shareMessage}</span></div></div>
+      <figure className="duel-photo"><Image src={`/mockup/assets/${isNo ? 'mugshot.jpg' : 'portrait.png'}`} alt={isNo ? 'Donald Trump’s August 24, 2023 Fulton County booking photo' : 'Official presidential portrait of Donald Trump'} fill priority sizes="(max-width: 760px) 100vw, 50vw" /><div className="duel-stamp">{previewSide ? 'WINNING VERSION PREVIEW' : isNo ? 'THE CROWN HAS BEEN REVOKED' : 'THE REIGNING OPINION'}</div><figcaption><span>{isNo ? 'Courtesy of ADD THE NOT · August 24, 2023' : 'Courtesy of KEEP THE CROWN'}</span><strong>{isNo ? 'A different kind of photo op.' : 'The man. The myth. The headlines.'}</strong></figcaption></figure>
     </section>
-    <section className="duel-battle" aria-labelledby="takeover"><div className="duel-battle-top"><h2 id="takeover">Agree? Defend it. Disagree? Edit it.</h2><p>Two sides. Higher total wins. The page flips.</p></div><div className="duel-meter" aria-hidden="true"><div style={{ width: `${yesPercent}%` }} /><div /></div>
-      <div className="duel-sides">{(['yes', 'no'] as const).map(side => <div className={`duel-side duel-side-${side}`} key={side}><div className="duel-side-top"><h3>{sideName(side)} · {side.toUpperCase()}</h3><span className="duel-total">{state ? money(side === 'yes' ? state.yesCents : state.noCents) : '—'}</span></div><p>{side === 'yes' ? 'He’s got your attention. That’s the argument. Keep the portrait, the praise, and the crown.' : 'Most interesting? Please. Add one beautifully petty word—and give this page a reality check.'}</p><button className="duel-contribute" onClick={() => choose(side)} disabled={!open}>{side === 'yes' ? 'Keep the crown ↗' : 'Add the NOT ↗'}</button></div>)}</div>
-      <div className="duel-battle-foot"><span>{state ? total === 0 ? 'No paid contributions yet. YES starts with the crown. First payment moves the total.' : `One word changes everything. ${sideName(trailing)} needs ${money(gap)} to take over${gap < 100 ? ' ($1 minimum payment)' : ''}.` : 'Waiting for verified totals.'}</span><span>One-time payments · No account needed · $1–$500</span></div>
+    <section className="duel-battle" aria-labelledby="takeover"><div className="duel-battle-top"><h2 id="takeover">Agree? Defend it. Disagree? Edit it.</h2><p>Two sides. One headline. Outfund the other side to flip it.</p></div><div className="duel-meter" aria-hidden="true"><div style={{ width: `${yesPercent}%` }} /><div /></div>
+      <div className="duel-sides">{(['yes', 'no'] as const).map(side => <div className={`duel-side duel-side-${side}`} key={side}><div className="duel-side-top"><h3>{sideName(side)} · {side.toUpperCase()}</h3><span className="duel-total">{state ? money(side === 'yes' ? state.yesCents : state.noCents) : '—'}</span></div><p>{side === 'yes' ? 'He’s got your attention. That’s the argument. Keep the portrait, the praise, and the crown.' : 'Most interesting? Please. Add one beautifully petty word—and give this page a reality check.'}</p><button type="button" className="duel-preview-button" aria-pressed={previewSide === side} onClick={() => preview(side)}>Preview this winning page ↗</button>{side === 'yes' && !!state?.yesStartingCreditCents && <small className="duel-credit">Includes {money(state.yesStartingCreditCents)} operator starting credit · not a paid contribution</small>}<button className="duel-contribute" onClick={() => choose(side)} disabled={!open}>{side === 'yes' ? 'Keep the crown ↗' : 'Add the NOT ↗'}</button></div>)}</div>
+      <div className="duel-battle-foot"><span>{state ? total === 0 ? 'YES starts with the crown. Waiting for the first contribution.' : `One word changes everything. ${sideName(trailing)} needs ${money(gap)} to take over${gap < 100 ? ' ($1 minimum payment)' : ''}.` : 'Waiting for verified totals.'}</span><span>One-time payments · No account needed · $1–$500</span></div>
       <p className="duel-payment-note">Payments go to the independent site operator. No prizes, payouts, or campaign donations. A payment adds to your side’s total; it does not guarantee a lead.</p>
       {!open && state && !loadError && <p className="duel-closed" role="status">Contributions are closed. The headline remains on display.</p>}
       {endLabel && <p className="duel-end">{open ? 'New checkouts close' : 'Checkout closing time'}: {endLabel}. Previously opened checkouts can finish within their roughly half-hour window.</p>}
@@ -124,9 +133,10 @@ export default function HeadlineExperiment({ initialState }: { initialState: Pub
       <div className="duel-facts"><div><strong>{isNo ? 'Same person' : '45th & 47th'}</strong><span>{isNo ? 'Different perspective' : 'U.S. president'}</span></div><div><strong>{isNo ? '2023' : 'Business → TV'}</strong><span>{isNo ? 'Booking photo' : 'A public career'}</span></div><div><strong>{isNo ? 'Crown revoked' : 'Crown defended'}</strong><span>An opinion, not a poll</span></div></div>
       <p className="duel-sources">Sources: <a href="https://www.whitehouse.gov/administration/donald-j-trump/" target="_blank" rel="noopener noreferrer">White House biography</a> · <a href="https://commons.wikimedia.org/wiki/File:Donald_Trump_mugshot.jpg" target="_blank" rel="noopener noreferrer">Fulton County photo / Wikimedia</a></p>
     </div></section>
-    <section className="duel-rules" id="how"><div><h3>01 / Pick your side.</h3><p>KEEP THE CROWN backs the portrait and praise. ADD THE NOT changes the headline, swaps in the mugshot, and serves the less flattering bio.</p></div><div><h3>02 / Move the total.</h3><p>Only confirmed USD payments count. The higher cumulative total controls the page. A tie leaves the current version in place. Refunds and disputes can change the totals.</p></div><div><h3>03 / Watch it flip.</h3><p>A lead is never a lock. The other side can take the page back. Totals refresh about every five seconds. No profiles. No uploads. Just one very public argument.</p></div></section>
+    <section className="duel-rules" id="how"><div><h3>01 / Pick your side.</h3><p>KEEP THE CROWN backs the portrait and praise. ADD THE NOT changes the headline, swaps in the mugshot, and serves the less flattering bio.</p></div><div><h3>02 / Move the total.</h3><p>YES starts with a disclosed $1 operator credit. NO must reach at least $2 and outfund YES to take over. After that, the higher total controls the page; ties keep the current version. Confirmed payments count. Refunds and disputes can change the result.</p></div><div><h3>03 / Watch it flip.</h3><p>A lead is never a lock. The other side can take the page back. Totals refresh about every five seconds. No profiles. No uploads. Just one very public argument.</p></div></section>
   </div>
   <dialog ref={dialog} className="duel-dialog" onCancel={event => { if (busy) event.preventDefault(); }}><button className="duel-dialog-close" aria-label="Close checkout" onClick={() => dialog.current?.close()} disabled={busy}>×</button><p className="duel-eyebrow">One-time headline contribution</p><h2>{selected === 'yes' ? 'Keep the crown.' : 'Add the NOT.'}</h2><p>Your payment increases the <strong>{sideName(selected)}</strong> total. If your side takes the lead, the headline, photo, and bio change.</p>
+    <button type="button" className="duel-preview-button" disabled={busy} onClick={() => preview(selected)}>Preview what this side buys ↗</button>
     <form onSubmit={checkout}><label htmlFor="contribution">Amount in USD</label><div className="duel-amounts">{['5', '10', '25'].map(value => <button type="button" key={value} disabled={busy} aria-pressed={amount === value} onClick={() => { setAmount(value); requestKey.current = null; }}>${value}</button>)}{selected === trailing && flipMinimum <= 50000 && <button type="button" disabled={busy} onClick={() => { setAmount((flipMinimum / 100).toFixed(2)); requestKey.current = null; }}>Take the lead · {money(flipMinimum)}</button>}</div>
       <input id="contribution" type="text" inputMode="decimal" value={amount} maxLength={8} onChange={event => { setAmount(event.target.value); requestKey.current = null; }} disabled={busy} required autoComplete="off" aria-describedby="amount-help" /><small id="amount-help">$1 minimum · $500 maximum · custom amounts welcome</small>
       <label className="duel-agreement"><input type="checkbox" checked={accepted} onChange={event => setAccepted(event.target.checked)} disabled={busy} required /><span>I accept the <Link href="/terms" target="_blank">terms</Link> and <Link href="/privacy" target="_blank">privacy policy</Link>. This payment goes to the site operator, gives no financial return, and does not guarantee my side stays ahead.</span></label>

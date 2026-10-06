@@ -24,6 +24,8 @@ export async function reserveCheckoutRequest(side: Side, amountCents: number, re
 export function publicState(state: ReturnType<typeof readState>) {
   return {
     yesCents: state.yesCents, noCents: state.noCents, winner: state.winner,
+    yesStartingCreditCents: state.yesStartingCreditCents,
+    noMinimumToWinCents: state.yesStartingCreditCents ? state.yesStartingCreditCents + 100 : 0,
     paymentsOpen: isOpen(state), endsAt: state.endsAt, paymentCount: state.paymentCount,
   };
 }

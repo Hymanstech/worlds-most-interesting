@@ -35,6 +35,28 @@ test('amount bounds reject fractions, strings, negative, zero, and nonfinite val
   assert.equal(core.isSide('yes'), true); assert.equal(core.isSide('YES'), false);
 });
 test('ties preserve the incumbent including a NO incumbent', () => { assert.equal(core.winningSide(500, 500, 'no'), 'no'); assert.equal(core.winningSide(0, 0), 'yes'); });
+
+test('the disclosed $1 credit requires NO to reach $2, including fractional totals and old webhook winner values', () => {
+  for (const noCents of [0, 100, 101, 199]) {
+    assert.equal(core.readState({ yesCents: 100, noCents, yesStartingCreditCents: 100, winner: 'no' }).winner, 'yes');
+  }
+  assert.equal(core.readState({ yesCents: 100, noCents: 200, yesStartingCreditCents: 100 }).winner, 'no');
+  assert.equal(core.readState({ yesCents: 200, noCents: 200, yesStartingCreditCents: 100, winner: 'no' }).winner, 'no');
+  assert.equal(core.readState({ yesCents: 200, noCents: 200, yesStartingCreditCents: 100, winner: 'yes' }).winner, 'yes');
+  assert.equal(core.readState({ yesCents: 300, noCents: 200, yesStartingCreditCents: 100, winner: 'no' }).winner, 'yes');
+});
+
+test('two $1 NO contributions win; refunds restore YES without removing its starting credit or inventing a payment', async () => {
+  const f = fixture(); Object.assign(f.state(), { yesCents: 100, yesStartingCreditCents: 100 });
+  f.charge.metadata.side = 'no'; f.charge.amount_captured = 100;
+  await ledger.reconcileCharge(f.db, f.stripe, 'ch_first');
+  assert.equal(f.state().winner, 'yes'); assert.equal(f.state().paymentCount, 1);
+  f.charge.id = 'ch_second'; await ledger.reconcileCharge(f.db, f.stripe, 'ch_second');
+  assert.equal(f.state().winner, 'no'); assert.equal(f.state().noCents, 200); assert.equal(f.state().paymentCount, 2);
+  f.charge.amount_refunded = 100; await ledger.reconcileCharge(f.db, f.stripe, 'ch_second');
+  assert.equal(f.state().winner, 'yes'); assert.equal(f.state().yesCents, 100); assert.equal(f.state().noCents, 100);
+  assert.equal(f.state().yesStartingCreditCents, 100); assert.equal(f.state().paymentCount, 2);
+});
 test('checkout remains closed until enabled, webhook-ready, and before end time', () => {
   const state = core.readState({ paymentsEnabled: true, webhookReady: true, endsAt: '2026-10-07T00:00:00Z' });
   assert.equal(core.isOpen(state, Date.parse('2026-10-06T00:00:00Z')), true);

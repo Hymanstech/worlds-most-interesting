@@ -36,7 +36,7 @@ export async function POST(request: Request) {
         currency: 'usd', unit_amount: body.amountCents,
         product_data: { name: `${name} — headline contribution`, description: 'One-time payment toward control of the World’s Most Interesting Person headline. No prize, payout, or guaranteed lead.' },
       } }],
-      metadata: { experiment: EXPERIMENT_ID, side: body.side, termsVersion: '2026-10-06' },
+      metadata: { experiment: EXPERIMENT_ID, side: body.side, termsVersion: '2026-10-06-starting-credit' },
       payment_intent_data: { metadata: { experiment: EXPERIMENT_ID, side: body.side }, description: `WMI headline experiment: ${name}` },
       success_url: `${siteOrigin()}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${siteOrigin()}/?checkout=cancelled`,

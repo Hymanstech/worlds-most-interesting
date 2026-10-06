@@ -16,6 +16,13 @@ export function winningSide(yes: number, no: number, incumbent: Side = 'yes'): S
   return yes > no ? 'yes' : no > yes ? 'no' : incumbent;
 }
 
+// The disclosed operator credit is part of YES's score, never a paid charge.
+// NO must reach $2 as well as outscore YES; cent amounts remain welcome.
+export function experimentWinner(yes: number, no: number, incumbent: Side, startingCredit: number): Side {
+  if (startingCredit > 0 && no < startingCredit + MIN_AMOUNT_CENTS) return 'yes';
+  return winningSide(yes, no, incumbent);
+}
+
 export function countedAmount(captured: number, refunded: number, disputeStatus?: string): number {
   if (disputeStatus && disputeStatus !== 'won' && disputeStatus !== 'warning_closed') return 0;
   return Math.max(0, captured - refunded);
@@ -26,6 +33,7 @@ export type ExperimentState = {
   mode: string;
   yesCents: number;
   noCents: number;
+  yesStartingCreditCents: number;
   winner: Side;
   paymentCount: number;
   paymentsEnabled: boolean;
@@ -37,11 +45,12 @@ export function readState(raw: Record<string, unknown> = {}): ExperimentState {
   const cents = (value: unknown) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : 0;
   const yesCents = cents(raw.yesCents);
   const noCents = cents(raw.noCents);
+  const yesStartingCreditCents = cents(raw.yesStartingCreditCents);
   return {
     experimentId: typeof raw.experimentId === 'string' ? raw.experimentId : EXPERIMENT_ID,
     mode: typeof raw.mode === 'string' ? raw.mode : 'headline-duel',
-    yesCents, noCents,
-    winner: winningSide(yesCents, noCents, isSide(raw.winner) ? raw.winner : 'yes'),
+    yesCents, noCents, yesStartingCreditCents,
+    winner: experimentWinner(yesCents, noCents, isSide(raw.winner) ? raw.winner : 'yes', yesStartingCreditCents),
     paymentCount: cents(raw.paymentCount),
     paymentsEnabled: raw.paymentsEnabled === true,
     endsAt: typeof raw.endsAt === 'string' && Number.isFinite(Date.parse(raw.endsAt)) ? raw.endsAt : null,
