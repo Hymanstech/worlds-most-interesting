@@ -1,0 +1,55 @@
+export const EXPERIMENT_ID = 'trump-headline-v1';
+export const MIN_AMOUNT_CENTS = 100;
+export const MAX_AMOUNT_CENTS = 50000;
+export type Side = 'yes' | 'no';
+
+export function isSide(value: unknown): value is Side {
+  return value === 'yes' || value === 'no';
+}
+
+export function validAmount(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) &&
+    value >= MIN_AMOUNT_CENTS && value <= MAX_AMOUNT_CENTS;
+}
+
+export function winningSide(yes: number, no: number, incumbent: Side = 'yes'): Side {
+  return yes > no ? 'yes' : no > yes ? 'no' : incumbent;
+}
+
+export function countedAmount(captured: number, refunded: number, disputeStatus?: string): number {
+  if (disputeStatus && disputeStatus !== 'won' && disputeStatus !== 'warning_closed') return 0;
+  return Math.max(0, captured - refunded);
+}
+
+export type ExperimentState = {
+  experimentId: string;
+  mode: string;
+  yesCents: number;
+  noCents: number;
+  winner: Side;
+  paymentCount: number;
+  paymentsEnabled: boolean;
+  endsAt: string | null;
+  webhookReady: boolean;
+};
+
+export function readState(raw: Record<string, unknown> = {}): ExperimentState {
+  const cents = (value: unknown) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : 0;
+  const yesCents = cents(raw.yesCents);
+  const noCents = cents(raw.noCents);
+  return {
+    experimentId: typeof raw.experimentId === 'string' ? raw.experimentId : EXPERIMENT_ID,
+    mode: typeof raw.mode === 'string' ? raw.mode : 'headline-duel',
+    yesCents, noCents,
+    winner: winningSide(yesCents, noCents, isSide(raw.winner) ? raw.winner : 'yes'),
+    paymentCount: cents(raw.paymentCount),
+    paymentsEnabled: raw.paymentsEnabled === true,
+    endsAt: typeof raw.endsAt === 'string' && Number.isFinite(Date.parse(raw.endsAt)) ? raw.endsAt : null,
+    webhookReady: raw.webhookReady === true,
+  };
+}
+
+export function isOpen(state: ExperimentState, now = Date.now()): boolean {
+  return state.mode === 'headline-duel' && state.experimentId === EXPERIMENT_ID &&
+    state.paymentsEnabled && state.webhookReady && (!state.endsAt || now < Date.parse(state.endsAt));
+}

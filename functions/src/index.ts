@@ -6,6 +6,8 @@ import * as admin from "firebase-admin";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import Stripe from "stripe";
+import { onRequest } from "firebase-functions/v2/https";
+import { handleExperimentEvent } from "./headline/ledger";
 import * as postmark from "postmark";
 
 admin.initializeApp();
@@ -19,6 +21,26 @@ setGlobalOptions({
 // Use Firebase Secret Manager (recommended)
 const STRIPE_SECRET_KEY = defineSecret("STRIPE_SECRET_KEY");
 const POSTMARK_SERVER_TOKEN = defineSecret("POSTMARK_SERVER_TOKEN");
+const STRIPE_WEBHOOK_SECRET = defineSecret("STRIPE_WEBHOOK_SECRET");
+
+export const headlineStripeWebhook = onRequest(
+  { secrets: [STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET], maxInstances: 5, timeoutSeconds: 60 },
+  async (req, res) => {
+    if (req.method !== 'POST') { res.status(405).send('POST required'); return; }
+    const stripe = new Stripe(STRIPE_SECRET_KEY.value());
+    let event: Stripe.Event;
+    try {
+      event = stripe.webhooks.constructEvent(req.rawBody, req.get('stripe-signature') || '', STRIPE_WEBHOOK_SECRET.value());
+    } catch { res.status(400).send('Invalid webhook signature'); return; }
+    try {
+      await handleExperimentEvent(admin.firestore(), stripe, event);
+      res.status(200).json({ received: true });
+    } catch (error) {
+      console.error('Headline reconciliation failed', event.id, error instanceof Error ? error.message : 'UnknownError');
+      res.status(500).send('Reconciliation failed; retry required');
+    }
+  }
+);
 
 // "YYYY-MM-DD" in America/Chicago
 function chicagoDateKey(d = new Date()) {
@@ -405,6 +427,10 @@ export const settleCrownNightly = onSchedule(
   },
   async () => {
     const db = admin.firestore();
+    if ((await db.collection('headlineExperiment').doc('current').get()).data()?.mode === 'headline-duel') {
+      console.log('Legacy nightly charging disabled: headline experiment is active');
+      return;
+    }
     const dateKey = chicagoDateKey(new Date());
     const crownRef = db.collection("crownStatus").doc("current");
 
@@ -800,6 +826,10 @@ export const prepareDailyXPostDraft = onSchedule(
     timeZone: "America/Chicago",
   },
   async () => {
+    if ((await admin.firestore().collection('headlineExperiment').doc('current').get()).data()?.mode === 'headline-duel') {
+      console.log('Legacy social draft scheduler disabled: headline experiment is active');
+      return;
+    }
     const dateKey = chicagoDateKey(new Date());
     await createOrUpdateDailyXPostDraft({ dateKey, overwrite: false });
   }

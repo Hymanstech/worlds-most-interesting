@@ -42,4 +42,6 @@ next-env.d.ts
 
 # Local secrets (never commit)
 secrets/
-
+.tools/
+firebase-debug.log
+firebase-debug.*.log

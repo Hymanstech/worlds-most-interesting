@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // All new product access goes through server routes and the Admin SDK.
+    // Browser Firebase Auth is used only to authenticate the administrator.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

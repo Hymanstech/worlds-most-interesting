@@ -1,20 +1,3 @@
-import PageHeader from '@/components/PageHeader';
-
-export default function ContactPage() {
-  return (
-    <div className="wmi-container wmi-section max-w-3xl">
-      <PageHeader
-        kicker="Contact"
-        title="Contact"
-        subtitle="For support or press inquiries, email support@worldsmostinteresting.com."
-      />
-
-      <div className="wmi-card mt-6 max-w-xl rounded-2xl p-6">
-        <p className="text-sm text-slate-700">
-          support@worldsmostinteresting.com
-        </p>
-      </div>
-    </div>
-  );
+export default function Contact() {
+  return <article className="experiment-content"><p>QUESTIONS, RECEIPTS, AND REALITY CHECKS</p><h1>Contact the project.</h1><p>For payment support, refund requests, privacy questions, or press inquiries, email <a href="mailto:support@worldsmostinteresting.com">support@worldsmostinteresting.com</a>.</p><p>If your question concerns a payment, include the receipt reference, date, amount, and side you selected. Please do not send your full card number or security code.</p><p>A payment confirmation can take a little time to reach the page. Please avoid making a second payment to fix a delayed first one.</p></article>;
 }
-

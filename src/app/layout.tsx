@@ -1,69 +1,16 @@
-// src/app/layout.tsx
 import type { Metadata } from 'next';
-import './globals.css';
-import AuthNav from '@/components/AuthNav';
 import Link from 'next/link';
-import Image from 'next/image';
-
+import './globals.css';
+import './experiment.css';
 export const metadata: Metadata = {
-  title: "World's Most Interesting Person",
-  description:
-    "Set your Crown Price and claim the crown as the World's Most Interesting Person.",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://www.worldsmostinteresting.com'),
+  title: 'World’s Most Interesting Person — One crown. One word.',
+  description: 'Keep the crown or add the NOT. The higher paid total controls the page. An independent humor experiment.',
 };
-
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return (
-    <html lang="en">
-      <body className="min-h-screen bg-[var(--wash)] text-[var(--ink)] antialiased">
-        <div className="flex min-h-screen flex-col">
-          <header className="border-b border-slate-200/60 bg-white">
-            <div className="wmi-container flex items-center justify-between gap-4 py-4 sm:py-5">
-              <Link href="/" className="flex items-center opacity-95 transition-opacity hover:opacity-100">
-                <Image
-                  src="/brand/wmi-logo-header.png"
-                  alt="World's Most Interesting"
-                  width={320}
-                  height={64}
-                  priority
-                  className="h-8 w-auto sm:h-12"
-                />
-              </Link>
-
-              <AuthNav />
-            </div>
-          </header>
-
-          <main className="flex-1 bg-[var(--wash)]">{children}</main>
-
-          <footer className="border-t border-slate-200/70 bg-white">
-            <div className="wmi-container py-6 text-xs text-slate-500">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>(c) {new Date().getFullYear()} World&apos;s Most Interesting Person</div>
-
-                <nav className="flex flex-wrap gap-x-4 gap-y-2 text-[11px] font-semibold uppercase tracking-[0.08em]">
-                  <Link href="/how-it-works" className="transition-opacity hover:opacity-70">
-                    How it works
-                  </Link>
-                  <Link href="/terms" className="transition-opacity hover:opacity-70">
-                    Terms
-                  </Link>
-                  <Link href="/privacy" className="transition-opacity hover:opacity-70">
-                    Privacy
-                  </Link>
-                  <Link href="/contact" className="transition-opacity hover:opacity-70">
-                    Contact
-                  </Link>
-                </nav>
-              </div>
-            </div>
-          </footer>
-        </div>
-      </body>
-    </html>
-  );
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return <html lang="en"><body className="experiment-shell">
+    <header className="experiment-header"><Link href="/" className="experiment-brand" aria-label="World’s Most Interesting Person home"><span aria-hidden="true">♛</span><span>World’s Most<br />Interesting Person</span></Link><Link href="/how-it-works">How to change the headline ↗</Link></header>
+    <main>{children}</main>
+    <footer className="experiment-footer"><div>An independent humor experiment. No candidate or campaign affiliation.<br />Payments go to the site operator. No prizes, payouts, or campaign donations.</div><nav aria-label="Footer"><Link href="/how-it-works">How it works</Link><Link href="/terms">Terms</Link><Link href="/privacy">Privacy</Link><Link href="/contact">Contact</Link></nav></footer>
+  </body></html>;
 }
-

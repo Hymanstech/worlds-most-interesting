@@ -1,79 +1,33 @@
-## World's Most Interesting
+# World’s Most Interesting Person
 
-Paid daily crown game built with Next.js, Firebase, and Stripe. Users create a profile, set a daily Crown Price, authorize a payment method, and compete to be featured on the homepage. Admin tooling supports moderation and manual crown assignment, and a cron route settles the nightly winner.
+A guest-checkout headline experiment built with Next.js, Firebase, and Stripe. KEEP THE CROWN (YES) and ADD THE NOT (NO) fund two alternate homepage treatments. Higher cumulative confirmed payments control the headline, image, and bio. Ties retain the incumbent; the initial incumbent is YES.
 
-## Stack
+## Development
 
-- Next.js App Router
-- Firebase Auth, Firestore, and Storage
-- Firebase Admin SDK for server routes
-- Stripe SetupIntents and off-session PaymentIntents
-- Optional Postmark password reset email delivery
+Install root and Functions dependencies with npm ci and npm --prefix functions ci. Run npm run dev. Validate with npm test, npm run build, and npm --prefix functions run build.
 
-## Local Development
+## Payment flow
 
-Install dependencies and run the app:
+POST /api/checkout creates a hosted Stripe Checkout Session for a one-time USD payment of $1–$500. No visitor authentication, card storage, or off-session charging. Server-side validation, origin checks, a shared Firestore rate limit, and Stripe idempotency keys protect session creation.
 
-```bash
-npm install
-npm run dev
-```
+The Firebase headlineStripeWebhook verifies the raw-body signature, retrieves current Stripe payment state, and reconciles a charge-keyed Firestore ledger in a transaction. The return-page /api/checkout/status endpoint uses the same reconciliation. Duplicate confirmations cannot add money twice. Refunds subtract credited amounts; open/lost disputes are excluded and won disputes restore eligible amounts.
 
-Production verification:
+## Configuration
 
-```bash
-npm run build
-```
+The existing server STRIPE_SECRET_KEY, Firebase Admin credentials (FIREBASE_ADMIN_JSON or Google application credentials), and ADMIN_UIDS are required. NEXT_PUBLIC_FIREBASE_* is only needed for administrator sign-in. APP_URL or NEXT_PUBLIC_SITE_URL sets the canonical site origin; production defaults to https://www.worldsmostinteresting.com.
 
-## Required Environment Variables
-
-Client:
-
-- `NEXT_PUBLIC_FIREBASE_API_KEY`
-- `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
-- `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
-- `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
-- `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
-- `NEXT_PUBLIC_FIREBASE_APP_ID`
-- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
-- `NEXT_PUBLIC_APP_URL` or `NEXT_PUBLIC_SITE_URL`
-
-Server:
-
-- `STRIPE_SECRET_KEY`
-- `FIREBASE_ADMIN_JSON` or equivalent Google application default credentials
-- `ADMIN_UIDS`
-- `CRON_SECRET`
-- `APP_URL` for password reset links
-- `POSTMARK_SERVER_TOKEN` if password reset email delivery is enabled
-
-## Core Flows
-
-- `/signup`: creates or resumes an account, stores legal acceptance, then routes to profile setup.
-- `/setup/profile`: sets bio, photo, and Crown Price.
-- `/setup/payment`: creates a Stripe SetupIntent and stores the default payment method.
-- `/dashboard`: lets users update price, manage card state, and view queue position.
-- `/admin`: admin-only operations page for user edits, crown status review, and manual assignment.
+The webhook signing secret belongs in Firebase Secret Manager as STRIPE_WEBHOOK_SECRET, alongside the existing STRIPE_SECRET_KEY. It does not need to be added to DigitalOcean. Use scripts/experiment-ops.cjs inspect, initialize, provision-webhook, pause-legacy, ttl, open, or close for operational tasks. These commands require authorized network access and existing Firebase/Stripe credentials. Never print credential objects. The open command requires a deployed signature-verifying webhook and sets a seven-day closing time if none exists.
 
 ## Operations
 
-- Nightly settlement runs through `POST /api/cron/settle-crown` with header `x-cron-secret: <CRON_SECRET>`.
-- Settlement charges the top eligible active user, updates `crownStatus/current`, and records the active winner snapshot.
-- X draft generation runs via the Firebase scheduled function `prepareDailyXPostDraft` at `12:35 AM` America/Chicago and writes a draft document to `social_posts/x-YYYY-MM-DD`.
-- Admins can generate X or Instagram drafts on demand through `POST /api/admin/generate-x-post` with a `platform` body value or from the admin UI buttons.
-- Admin access is controlled by Firebase custom claim `admin: true` or by `ADMIN_UIDS`.
-- Payment routes are expected to be called with a Firebase ID token in the `Authorization: Bearer <token>` header.
+/admin uses the existing administrator Firebase account. It displays the latest 50 payments, links to Stripe for refunds, and lets the administrator pause checkout or change its closing time. Totals are not editable. Previously opened checkouts can complete within 30 minutes after a pause or closing time. Refunds/disputes can still change the result afterward.
 
-## Launch Checklist
+Firestore collections: headlineExperiment/current (settings and aggregate totals), headlinePayments/{chargeId} (private ledger), and headlineRateLimits/{hash} (abuse limits; expiresAt TTL). All browser Firestore reads/writes are denied. Public totals are served by /api/experiment; admin routes verify Firebase tokens and admin claims/UIDs on the server.
 
-- Configure all environment variables in the deployment target.
-- Confirm Firebase Auth, Firestore, and Storage rules are correct for production.
-- Ensure the nightly cron job is configured and sending `x-cron-secret`.
-- Seed at least one admin UID.
-- Run a production build before deploy.
-- Exercise signup, profile setup, payment setup, dashboard update, admin assign, and nightly settlement in a staging environment.
+## Deployment
 
-## Current Gaps
+The existing DigitalOcean app builds origin/main automatically. The webhook and legacy scheduler guards deploy separately with Firebase. scripts/firebase-safe.cjs filters CLI debug output; use it instead of JSON sign-in listings. Confirm deployment and webhook operation before opening contributions.
 
-- There is not yet an automated test suite for the payment and crown-settlement flows.
-- Linting may require a shell environment where `npm` is available on PATH.
+Legacy daily-crown source and historical user records are retained. The Next.js proxy redirects old account/profile pages and returns HTTP 410 for retired payment/settlement/admin endpoints. Legacy Cloud Scheduler jobs must remain paused; the new function guards also refuse to run while headline-duel mode is active. No existing saved cards are charged.
+
+The standalone first-pass mockup remains under public/mockup and is explicitly demo-only. Production totals always start at zero and reflect verified payments.
