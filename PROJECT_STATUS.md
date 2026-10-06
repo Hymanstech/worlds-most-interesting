@@ -1,8 +1,34 @@
 # Project Status
 
-Last updated: 2026-03-11 14:48:36 -05:00
+Last updated: 2026-10-06 (paid headline experiment launch)
 
-## Current State
+## Current State — Paid Headline Experiment
+
+- Branch: main. Shipped implementation commit: 9a4d49a. Production: https://www.worldsmostinteresting.com.
+- Replaced the daily crown homepage with KEEP THE CROWN / ADD THE NOT. Guest Stripe Checkout; no visitor accounts, profiles, uploads, or saved-card setup. Old public account pages redirect home; old payment, settlement, and admin APIs return HTTP 410.
+- Confirmed paid USD totals control the headline, portrait/mugshot, and editorial bio. Initial YES/NO totals are real zeroes; a tie retains the incumbent.
+- Charge-keyed Firestore transactions handle duplicate confirmations, partial/full refunds, pending/failed refunds, and disputes. Return-page confirmation and the signed Firebase webhook share the same reconciliation.
+- Fixed checkout retry parameters: a request reserves one stable expiration, and retries reuse its saved session URL. One-time payments are $1–$500; no prizes, payouts, campaign donations, or recurring charges.
+- Deployed headlineStripeWebhook and the legacy scheduler guards. Both legacy scheduler jobs are PAUSED. All browser Firestore reads/writes are denied; the admin UI uses server-verified Firebase tokens. Ephemeral rate-limit and checkout-request records have TTL enabled.
+- Production guest checkout is open. New checkouts close Oct 13, 2026, 12:59 PM America/Chicago. The admin can pause checkout or change the closing time. Existing checkouts may complete within roughly half an hour.
+- Validation: 14 automated accounting/security/retry tests, Next.js production build, and Functions build passed. Production pages/assets, legacy redirects/HTTP 410, unsigned admin rejection, webhook signature rejection/acceptance, and both unpaid live Checkout Session creation/retry/pending/expiration flows verified. No real money was charged by validation.
+- /admin now shows the latest 50 confirmed payments, links to Stripe refunds, and checkout pause/end controls. Historical user records and original daily-crown source are retained; old saved cards are not charged.
+
+### Remaining verification and privacy items
+
+- Browser visual QA unavailable because no browser connection was available. The owner reviewed the first-pass visual mockup.
+- A successful card charge/refund end-to-end test has not been performed. Optional retained-key sandbox validation was blocked by automatic approval review when application credentials lacked permission and broader CLI credentials would have been used; explicit owner approval and a fresh Firebase CLI sign-in are required.
+- A Firebase CLI login listing unexpectedly printed saved OAuth credentials into tool output. The exposed CLI sign-in was revoked after launch checks; future Firebase deployments require a fresh sign-in. They were not added to source. Do not run JSON sign-in listings; firebase-safe.cjs suppresses CLI debug/API bodies.
+- The existing GitHub repository is public and associates this project with its owner. Project branding on the website does not provide anonymity; repository visibility and checkout merchant identity still need owner consideration.
+- Receiving-mailbox delivery for the existing support address was not tested. No emails or social posts were sent during this conversion.
+
+### Next recommended steps
+
+1. Monitor the Stripe dashboard and private ledger after the first real contribution; resolve support/refund requests there.
+2. Use /admin to pause contributions or adjust the end time. Keep the retired nightly jobs paused.
+3. Make the repository private if personal separation is important, and review the identity displayed by checkout/receipts.
+
+## Legacy Daily Crown State (archived)
 
 - Branch: `main`
 - Latest shipped commit: `6543e43`
