@@ -6,7 +6,7 @@ const ts = require('typescript');
 function load(path, dependencies = {}) {
   const source = ts.transpileModule(fs.readFileSync(path, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
   const module = { exports: {} };
-  vm.runInNewContext(source, { module, exports: module.exports, require: name => dependencies[name] || require(name), Date, console });
+  vm.runInNewContext(source, { module, exports: module.exports, require: name => dependencies[name] || require(name), Date, console, TextEncoder, ReadableStream, Response, setInterval, clearInterval, setTimeout, clearTimeout });
   return module.exports;
 }
 const core = load('functions/src/headline/core.ts');
@@ -29,10 +29,34 @@ function fixture() {
   const stripe = { charges: { retrieve: async () => ({ ...charge, metadata: { ...charge.metadata } }) }, refunds: { list: async function* () { for (const refund of refunds || [{ status: 'succeeded', amount: charge.amount_refunded }]) yield refund; } }, disputes: { list: async () => ({ data: [{ status: dispute }] }) }, checkout: { sessions: { retrieve: async () => session } }, paymentIntents: { retrieve: async () => ({ status: 'succeeded', metadata: charge.metadata, latest_charge: charge.id }) } };
   return { db, stripe, charge, session, documents, state: () => documents.get('headlineExperiment/current'), setDispute: value => { dispute = value; }, setRefunds: value => { refunds = value; } };
 }
-test('amount bounds reject fractions, strings, negative, zero, and nonfinite values', () => {
-  for (const amount of [0, -1, 99, 50001, 100.1, Infinity, NaN, '500']) assert.equal(core.validAmount(amount), false);
-  for (const amount of [100, 500, 50000]) assert.equal(core.validAmount(amount), true);
+test('amount validation permits thousands and larger payments but rejects invalid cent values', () => {
+  for (const amount of [0, -1, 99, Number.MAX_SAFE_INTEGER + 1, 100.1, Infinity, NaN, '500']) assert.equal(core.validAmount(amount), false);
+  for (const amount of [100, 500, 50000, 50001, 1000000, 999999999999]) assert.equal(core.validAmount(amount), true);
   assert.equal(core.isSide('yes'), true); assert.equal(core.isSide('YES'), false);
+});
+
+test('USD parsing retains cents exactly for large contributions and rejects unsafe or malformed amounts', () => {
+  for (const [input, expected] of [['1000', 100000], ['10000.99', 1000099], ['9999999999.99', 999999999999], ['1.01', 101], ['0001.1', 110]]) assert.equal(core.parseUsdAmount(input), expected);
+  for (const input of ['1.001', '-1', 'NaN', '1e6', '900719925474099.99']) assert.equal(core.parseUsdAmount(input), null);
+});
+
+test('live stream publishes changing public totals and unsubscribes on cancellation without leaking private fields', async () => {
+  let next, unsubscribed = 0;
+  const f = fixture();
+  const server = load('src/lib/experimentServer.ts', { '@/lib/firebaseAdmin': { adminDb: f.db }, '@/lib/experiment': core });
+  const events = load('src/app/api/experiment/events/route.ts', {
+    '@/lib/firebaseAdmin': { adminDb: { collection: () => ({ doc: () => ({ onSnapshot: callback => { next = callback; return () => unsubscribed++; } }) }) } },
+    '@/lib/experiment': core, '@/lib/experimentServer': server,
+  });
+  const response = await events.GET(new Request('http://localhost/api/experiment/events'));
+  assert.ok(response.headers.get('content-type').startsWith('text/event-stream'));
+  const reader = response.body.getReader(); await reader.read();
+  next({ data: () => ({ yesCents: 100, noCents: 0, yesStartingCreditCents: 100, customerEmail: 'private@example.invalid' }) });
+  let text = new TextDecoder().decode((await reader.read()).value);
+  assert.ok(text.includes('"winner":"yes"')); assert.ok(!text.includes('customerEmail'));
+  next({ data: () => ({ yesCents: 100, noCents: 200, yesStartingCreditCents: 100 }) });
+  text = new TextDecoder().decode((await reader.read()).value); assert.ok(text.includes('"winner":"no"'));
+  await reader.cancel(); assert.equal(unsubscribed, 1);
 });
 test('ties preserve the incumbent including a NO incumbent', () => { assert.equal(core.winningSide(500, 500, 'no'), 'no'); assert.equal(core.winningSide(0, 0), 'yes'); });
 

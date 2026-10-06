@@ -14,8 +14,23 @@ async function json(response, stage) {
 async function main() {
   const before = await json(await fetch(`${base}/api/experiment`, { cache: 'no-store' }), 'Initial totals');
   assert.equal(before.paymentsOpen, true);
+  const account = await stripe.accounts.retrieve();
+  assert.equal(account.charges_enabled, true, 'Stripe must permit live charges');
+  assert.equal(account.payouts_enabled, true, 'Stripe must permit payouts');
+  assert.equal(account.capabilities?.card_payments, 'active', 'Card payments must be active');
+  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  const webhookUrl = `https://us-central1-${projectId}.cloudfunctions.net/headlineStripeWebhook`;
+  const endpoints = await stripe.webhookEndpoints.list({ limit: 100 });
+  const endpoint = endpoints.data.find(item => item.url === webhookUrl && item.status === 'enabled');
+  assert.ok(endpoint?.livemode, 'Live accounting webhook must be enabled');
+  for (const type of ['checkout.session.completed', 'charge.refunded', 'charge.dispute.closed', 'refund.failed']) assert.ok(endpoint.enabled_events.includes(type));
+  const rejected = await fetch(webhookUrl, { method: 'POST', body: '{}', signal: AbortSignal.timeout(30000) });
+  assert.equal(rejected.status, 400, 'Unsigned webhook calls must be rejected');
+  console.log('Live Stripe charges, card payments, payouts, and accounting webhook are enabled; unsigned callbacks rejected.');
   for (const side of ['yes', 'no']) {
-    const body = { side, amountCents: 100, acceptedTerms: true, requestId: randomUUID() };
+    // Verify thousands through production without entering a card or charging.
+    const amountCents = side === 'yes' ? 100000 : 1000000;
+    const body = { side, amountCents, acceptedTerms: true, requestId: randomUUID() };
     const create = () => fetch(`${base}/api/checkout`, { method: 'POST', headers: { Origin: base, 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(30000) });
     const response = await create();
     const data = await json(response, `${side} checkout creation`);
@@ -24,13 +39,13 @@ async function main() {
     assert.ok(sessionId, 'Expected a live hosted-checkout session');
     try {
       const session = await stripe.checkout.sessions.retrieve(sessionId);
-      assert.equal(session.mode, 'payment'); assert.equal(session.currency, 'usd'); assert.equal(session.amount_total, 100);
+      assert.equal(session.mode, 'payment'); assert.equal(session.currency, 'usd'); assert.equal(session.amount_total, amountCents);
       assert.equal(session.metadata.experiment, 'trump-headline-v1'); assert.equal(session.metadata.side, side);
       assert.equal(session.payment_status, 'unpaid'); assert.equal(session.livemode, true);
       const repeated = await json(await create(), `${side} checkout retry`); assert.equal(repeated.url, data.url, 'Retries must reuse the checkout');
       const pending = await json(await fetch(`${base}/api/checkout/status?session_id=${sessionId}`, { cache: 'no-store' }), `${side} pending status`);
       assert.equal(pending.status, 'pending');
-      console.log(`${side.toUpperCase()}: live guest checkout, correct amount/metadata, idempotent retry, unpaid checkout not counted.`);
+      console.log(`${side.toUpperCase()}: $${amountCents / 100} live guest checkout, correct amount/metadata, idempotent retry, unpaid checkout not counted.`);
     } finally { await stripe.checkout.sessions.expire(sessionId); }
     const expired = await json(await fetch(`${base}/api/checkout/status?session_id=${sessionId}`, { cache: 'no-store' }), `${side} expired status`);
     assert.equal(expired.status, 'expired');

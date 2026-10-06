@@ -15,7 +15,7 @@ export async function POST(request: Request) {
   } catch { return NextResponse.json({ error: 'Invalid request.' }, { status: 400 }); }
   if (!body || !isSide(body.side) || !validAmount(body.amountCents) || body.acceptedTerms !== true ||
       typeof body.requestId !== 'string' || !/^[a-f0-9-]{36}$/i.test(body.requestId)) {
-    return NextResponse.json({ error: 'Choose a side, enter $1–$500, and accept the terms.' }, { status: 400 });
+    return NextResponse.json({ error: 'Choose a side, enter a valid amount of at least $1, and accept the terms.' }, { status: 400 });
   }
   try {
     const state = await getExperimentState();
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
         currency: 'usd', unit_amount: body.amountCents,
         product_data: { name: `${name} — headline contribution`, description: 'One-time payment toward control of the World’s Most Interesting Person headline. No prize, payout, or guaranteed lead.' },
       } }],
-      metadata: { experiment: EXPERIMENT_ID, side: body.side, termsVersion: '2026-10-06-starting-credit' },
+      metadata: { experiment: EXPERIMENT_ID, side: body.side, termsVersion: '2026-10-06-live-unlimited' },
       payment_intent_data: { metadata: { experiment: EXPERIMENT_ID, side: body.side }, description: `WMI headline experiment: ${name}` },
       success_url: `${siteOrigin()}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${siteOrigin()}/?checkout=cancelled`,
@@ -47,6 +47,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ url: session.url });
   } catch (error) {
     console.error('Headline checkout failed', error instanceof Error ? error.name : 'UnknownError');
+    if (error && typeof error === 'object' && 'type' in error && error.type === 'StripeInvalidRequestError' && 'param' in error && typeof error.param === 'string' && /amount/.test(error.param)) {
+      return NextResponse.json({ error: 'Stripe could not accept this amount. Try a smaller contribution or contact support.' }, { status: 400 });
+    }
     return NextResponse.json({ error: 'Checkout is temporarily unavailable. No payment was taken here. Please try again.' }, { status: 503 });
   }
 }

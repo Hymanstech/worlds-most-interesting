@@ -1,6 +1,5 @@
 export const EXPERIMENT_ID = 'trump-headline-v1';
 export const MIN_AMOUNT_CENTS = 100;
-export const MAX_AMOUNT_CENTS = 50000;
 export type Side = 'yes' | 'no';
 
 export function isSide(value: unknown): value is Side {
@@ -9,7 +8,16 @@ export function isSide(value: unknown): value is Side {
 
 export function validAmount(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) &&
-    value >= MIN_AMOUNT_CENTS && value <= MAX_AMOUNT_CENTS;
+    value >= MIN_AMOUNT_CENTS;
+}
+
+export function parseUsdAmount(value: string): number | null {
+  if (!/^\d+(\.\d{1,2})?$/.test(value)) return null;
+  const [dollars, fraction = ''] = value.split('.');
+  const digits = (dollars + fraction.padEnd(2, '0')).replace(/^0+/, '') || '0';
+  if (digits.length > 16) return null;
+  const cents = Number(digits);
+  return Number.isSafeInteger(cents) ? cents : null;
 }
 
 export function winningSide(yes: number, no: number, incumbent: Side = 'yes'): Side {

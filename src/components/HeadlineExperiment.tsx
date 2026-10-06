@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { parseUsdAmount, validAmount } from '@/lib/experimentAmount';
 type Side = 'yes' | 'no';
 type PublicState = { yesCents: number; noCents: number; yesStartingCreditCents: number; noMinimumToWinCents: number; winner: Side; paymentsOpen: boolean; endsAt: string | null; paymentCount: number };
 const money = (cents: number) => (cents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
@@ -22,24 +23,35 @@ export default function HeadlineExperiment({ initialState }: { initialState: Pub
   const requestKey = useRef<string | null>(null);
   const pollBusy = useRef(false);
   const alive = useRef(true);
+  const streamConnected = useRef(false);
+  const streamRevision = useRef(0);
   const refresh = useCallback(async () => {
     if (pollBusy.current) return;
     pollBusy.current = true;
+    const revision = streamRevision.current;
     try {
       const response = await fetch('/api/experiment', { cache: 'no-store', signal: AbortSignal.timeout(15000) });
       if (!response.ok) throw new Error('Unavailable');
       const data: PublicState = await response.json();
-      if (alive.current) { setState(data); setLoadError(''); }
-    } catch { if (alive.current) setLoadError('Live totals could not be refreshed. Checkout is paused here until we reconnect.'); }
+      if (alive.current && revision === streamRevision.current) { setState(data); setLoadError(''); }
+    } catch { if (alive.current && !streamConnected.current) setLoadError('Live totals could not be refreshed. Checkout is paused here until we reconnect.'); }
     finally { pollBusy.current = false; }
   }, []);
   useEffect(() => {
     alive.current = true; void refresh();
-    const interval = setInterval(() => { if (document.visibilityState === 'visible') void refresh(); }, 5000);
+    const events = new EventSource('/api/experiment/events');
+    events.addEventListener('totals', event => {
+      try {
+        const data: PublicState = JSON.parse((event as MessageEvent).data);
+        if (alive.current) { streamRevision.current++; streamConnected.current = true; setState(data); setLoadError(''); }
+      } catch { streamConnected.current = false; void refresh(); }
+    });
+    events.onerror = () => { streamConnected.current = false; void refresh(); };
+    const interval = setInterval(() => { if (!streamConnected.current && document.visibilityState === 'visible') void refresh(); }, 1000);
     const clock = setInterval(() => setNow(Date.now()), 1000);
     const onFocus = () => void refresh();
     window.addEventListener('focus', onFocus);
-    return () => { alive.current = false; clearInterval(interval); clearInterval(clock); window.removeEventListener('focus', onFocus); };
+    return () => { alive.current = false; streamConnected.current = false; events.close(); clearInterval(interval); clearInterval(clock); window.removeEventListener('focus', onFocus); };
   }, [refresh]);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -91,8 +103,8 @@ export default function HeadlineExperiment({ initialState }: { initialState: Pub
   async function checkout(event: React.FormEvent) {
     event.preventDefault(); if (busy) return;
     if (!/^\d+(\.\d{1,2})?$/.test(amount)) { setCheckoutError('Enter a dollar amount with up to two decimal places.'); return; }
-    const amountCents = Math.round(Number(amount) * 100);
-    if (!Number.isSafeInteger(amountCents) || amountCents < 100 || amountCents > 50000 || !accepted) { setCheckoutError('Choose $1–$500 and accept the terms to continue.'); return; }
+    const amountCents = parseUsdAmount(amount);
+    if (!validAmount(amountCents) || !accepted) { setCheckoutError('Enter a valid amount of at least $1 and accept the terms to continue.'); return; }
     setBusy(true); setCheckoutError('');
     try {
       requestKey.current ||= crypto.randomUUID();
@@ -122,7 +134,7 @@ export default function HeadlineExperiment({ initialState }: { initialState: Pub
     </section>
     <section className="duel-battle" aria-labelledby="takeover"><div className="duel-battle-top"><h2 id="takeover">Agree? Defend it. Disagree? Edit it.</h2><p>Two sides. One headline. Outfund the other side to flip it.</p></div><div className="duel-meter" aria-hidden="true"><div style={{ width: `${yesPercent}%` }} /><div /></div>
       <div className="duel-sides">{(['yes', 'no'] as const).map(side => <div className={`duel-side duel-side-${side}`} key={side}><div className="duel-side-top"><h3>{sideName(side)} · {side.toUpperCase()}</h3><span className="duel-total">{state ? money(side === 'yes' ? state.yesCents : state.noCents) : '—'}</span></div><p>{side === 'yes' ? 'He’s got your attention. That’s the argument. Keep the portrait, the praise, and the crown.' : 'Most interesting? Please. Add one beautifully petty word—and give this page a reality check.'}</p><button type="button" className="duel-preview-button" aria-pressed={previewSide === side} onClick={() => preview(side)}>Preview this winning page ↗</button>{side === 'yes' && !!state?.yesStartingCreditCents && <small className="duel-credit">Includes {money(state.yesStartingCreditCents)} operator starting credit · not a paid contribution</small>}<button className="duel-contribute" onClick={() => choose(side)} disabled={!open}>{side === 'yes' ? 'Keep the crown ↗' : 'Add the NOT ↗'}</button></div>)}</div>
-      <div className="duel-battle-foot"><span>{state ? total === 0 ? 'YES starts with the crown. Waiting for the first contribution.' : `One word changes everything. ${sideName(trailing)} needs ${money(gap)} to take over${gap < 100 ? ' ($1 minimum payment)' : ''}.` : 'Waiting for verified totals.'}</span><span>One-time payments · No account needed · $1–$500</span></div>
+      <div className="duel-battle-foot"><span>{state ? total === 0 ? 'YES starts with the crown. Waiting for the first contribution.' : `One word changes everything. ${sideName(trailing)} needs ${money(gap)} to take over${gap < 100 ? ' ($1 minimum payment)' : ''}.` : 'Waiting for verified totals.'}</span><span>One-time payments · No account needed · $1 minimum</span></div>
       <p className="duel-payment-note">Payments go to the independent site operator. No prizes, payouts, or campaign donations. A payment adds to your side’s total; it does not guarantee a lead.</p>
       {!open && state && !loadError && <p className="duel-closed" role="status">Contributions are closed. The headline remains on display.</p>}
       {endLabel && <p className="duel-end">{open ? 'New checkouts close' : 'Checkout closing time'}: {endLabel}. Previously opened checkouts can finish within their roughly half-hour window.</p>}
@@ -133,14 +145,14 @@ export default function HeadlineExperiment({ initialState }: { initialState: Pub
       <div className="duel-facts"><div><strong>{isNo ? 'Same person' : '45th & 47th'}</strong><span>{isNo ? 'Different perspective' : 'U.S. president'}</span></div><div><strong>{isNo ? '2023' : 'Business → TV'}</strong><span>{isNo ? 'Booking photo' : 'A public career'}</span></div><div><strong>{isNo ? 'Crown revoked' : 'Crown defended'}</strong><span>An opinion, not a poll</span></div></div>
       <p className="duel-sources">Sources: <a href="https://www.whitehouse.gov/administration/donald-j-trump/" target="_blank" rel="noopener noreferrer">White House biography</a> · <a href="https://commons.wikimedia.org/wiki/File:Donald_Trump_mugshot.jpg" target="_blank" rel="noopener noreferrer">Fulton County photo / Wikimedia</a></p>
     </div></section>
-    <section className="duel-rules" id="how"><div><h3>01 / Pick your side.</h3><p>KEEP THE CROWN backs the portrait and praise. ADD THE NOT changes the headline, swaps in the mugshot, and serves the less flattering bio.</p></div><div><h3>02 / Move the total.</h3><p>YES starts with a disclosed $1 operator credit. NO must reach at least $2 and outfund YES to take over. After that, the higher total controls the page; ties keep the current version. Confirmed payments count. Refunds and disputes can change the result.</p></div><div><h3>03 / Watch it flip.</h3><p>A lead is never a lock. The other side can take the page back. Totals refresh about every five seconds. No profiles. No uploads. Just one very public argument.</p></div></section>
+    <section className="duel-rules" id="how"><div><h3>01 / Pick your side.</h3><p>KEEP THE CROWN backs the portrait and praise. ADD THE NOT changes the headline, swaps in the mugshot, and serves the less flattering bio.</p></div><div><h3>02 / Move the total.</h3><p>YES starts with a disclosed $1 operator credit. NO must reach at least $2 and outfund YES to take over. After that, the higher total controls the page; ties keep the current version. Confirmed payments count. Refunds and disputes can change the result.</p></div><div><h3>03 / Watch it flip.</h3><p>A lead is never a lock. The other side can take the page back. The page updates live when confirmed payments change the result. No profiles. No uploads. Just one very public argument.</p></div></section>
   </div>
   <dialog ref={dialog} className="duel-dialog" onCancel={event => { if (busy) event.preventDefault(); }}><button className="duel-dialog-close" aria-label="Close checkout" onClick={() => dialog.current?.close()} disabled={busy}>×</button><p className="duel-eyebrow">One-time headline contribution</p><h2>{selected === 'yes' ? 'Keep the crown.' : 'Add the NOT.'}</h2><p>Your payment increases the <strong>{sideName(selected)}</strong> total. If your side takes the lead, the headline, photo, and bio change.</p>
     <button type="button" className="duel-preview-button" disabled={busy} onClick={() => preview(selected)}>Preview what this side buys ↗</button>
-    <form onSubmit={checkout}><label htmlFor="contribution">Amount in USD</label><div className="duel-amounts">{['5', '10', '25'].map(value => <button type="button" key={value} disabled={busy} aria-pressed={amount === value} onClick={() => { setAmount(value); requestKey.current = null; }}>${value}</button>)}{selected === trailing && flipMinimum <= 50000 && <button type="button" disabled={busy} onClick={() => { setAmount((flipMinimum / 100).toFixed(2)); requestKey.current = null; }}>Take the lead · {money(flipMinimum)}</button>}</div>
-      <input id="contribution" type="text" inputMode="decimal" value={amount} maxLength={8} onChange={event => { setAmount(event.target.value); requestKey.current = null; }} disabled={busy} required autoComplete="off" aria-describedby="amount-help" /><small id="amount-help">$1 minimum · $500 maximum · custom amounts welcome</small>
+    <form onSubmit={checkout}><label htmlFor="contribution">Amount in USD</label><div className="duel-amounts">{['5', '10', '25'].map(value => <button type="button" key={value} disabled={busy} aria-pressed={amount === value} onClick={() => { setAmount(value); requestKey.current = null; }}>${value}</button>)}{selected === trailing && validAmount(flipMinimum) && <button type="button" disabled={busy} onClick={() => { setAmount((flipMinimum / 100).toFixed(2)); requestKey.current = null; }}>Take the lead · {money(flipMinimum)}</button>}</div>
+      <input id="contribution" type="text" inputMode="decimal" value={amount} maxLength={32} onChange={event => { setAmount(event.target.value); requestKey.current = null; }} disabled={busy} required autoComplete="off" aria-describedby="amount-help" /><small id="amount-help">$1 minimum · choose any amount</small>
       <label className="duel-agreement"><input type="checkbox" checked={accepted} onChange={event => setAccepted(event.target.checked)} disabled={busy} required /><span>I accept the <Link href="/terms" target="_blank">terms</Link> and <Link href="/privacy" target="_blank">privacy policy</Link>. This payment goes to the site operator, gives no financial return, and does not guarantee my side stays ahead.</span></label>
-      {checkoutError && <p className="duel-error" role="alert">{checkoutError}</p>}<button className={`duel-contribute duel-checkout-${selected}`} type="submit" disabled={busy || !open}>{busy ? 'Opening secure checkout…' : `Continue to Stripe · ${/^\d+(\.\d{1,2})?$/.test(amount) ? money(Math.round(Number(amount) * 100)) : 'choose an amount'}`}</button><p className="duel-checkout-note">Secure guest checkout by Stripe. No account, recurring charge, prize, or political donation. The other side can overtake you immediately.</p>
+      {checkoutError && <p className="duel-error" role="alert">{checkoutError}</p>}<button className={`duel-contribute duel-checkout-${selected}`} type="submit" disabled={busy || !open}>{busy ? 'Opening secure checkout…' : `Continue to Stripe · ${/^\d+(\.\d{1,2})?$/.test(amount) ? money(parseUsdAmount(amount) ?? 0) : 'choose an amount'}`}</button><p className="duel-checkout-note">Secure guest checkout by Stripe. No account, recurring charge, prize, or political donation. The other side can overtake you immediately.</p>
     </form>
   </dialog></div>;
 }

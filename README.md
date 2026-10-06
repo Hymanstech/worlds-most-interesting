@@ -8,7 +8,7 @@ Install root and Functions dependencies with npm ci and npm --prefix functions c
 
 ## Payment flow
 
-POST /api/checkout creates a hosted Stripe Checkout Session for a one-time USD payment of $1–$500. No visitor authentication, card storage, or off-session charging. Server-side validation, origin checks, a shared Firestore rate limit, and Stripe idempotency keys protect session creation.
+POST /api/checkout creates a hosted Stripe Checkout Session for a one-time USD payment of at least $1. No visitor authentication, card storage, or off-session charging. Server-side validation, origin checks, a shared Firestore rate limit, and Stripe idempotency keys protect session creation.
 
 The Firebase headlineStripeWebhook verifies the raw-body signature, retrieves current Stripe payment state, and reconciles a charge-keyed Firestore ledger in a transaction. The return-page /api/checkout/status endpoint uses the same reconciliation. Duplicate confirmations cannot add money twice. Refunds subtract credited amounts; open/lost disputes are excluded and won disputes restore eligible amounts.
 
@@ -30,4 +30,4 @@ The existing DigitalOcean app builds origin/main automatically. The webhook and 
 
 Legacy daily-crown source and historical user records are retained. The Next.js proxy redirects old account/profile pages and returns HTTP 410 for retired payment/settlement/admin endpoints. Legacy Cloud Scheduler jobs must remain paused; the new function guards also refuse to run while headline-duel mode is active. No existing saved cards are charged.
 
-The standalone first-pass mockup remains under public/mockup and is explicitly demo-only. Production totals always start at zero and reflect verified payments.
+The standalone first-pass mockup remains under public/mockup and is explicitly demo-only. YES includes a disclosed $1 operator starting credit; NO must reach $2 and outscore YES. All other totals reflect verified payments. Public updates stream through /api/experiment/events, with a one-second polling fallback during connection interruptions.
