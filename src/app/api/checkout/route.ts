@@ -32,6 +32,7 @@ export async function POST(request: Request) {
     const name = body.side === 'yes' ? 'Keep the crown' : 'Add the NOT';
     const session = await stripe.checkout.sessions.create({
       mode: 'payment', payment_method_types: ['card'], submit_type: 'pay',
+      branding_settings: { display_name: 'World’s Most Interesting Person' },
       line_items: [{ quantity: 1, price_data: {
         currency: 'usd', unit_amount: body.amountCents,
         product_data: { name: `${name} — headline points`, description: 'Satirical entertainment: $1 buys 1 point. Whole dollar purchases only. Initial game points YES 1764 / NO 1763 are not previous purchases. No guaranteed win or display time. All sales final except where required by law.' },
