@@ -11,3 +11,5 @@
 .duel-score-explainer{font-size:13px;line-height:1.7;margin:18px 0;color:#51564a}.duel-total{font-size:30px}@media(max-width:760px){.duel-total{font-size:25px}}
 
 .duel-total .duel-score-label{display:block;font:10px/1.5 Arial,Helvetica,sans-serif;letter-spacing:1px;text-transform:uppercase;color:#65665a;margin-bottom:4px}
+
+.duel-score-explainer{font-size:14px;line-height:1.6}.duel-score-explainer a{text-decoration:underline;text-underline-offset:3px;margin-left:5px}
